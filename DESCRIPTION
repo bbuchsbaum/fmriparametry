@@ -1,0 +1,40 @@
+Package: fmriparametric
+Type: Package
+Title: Extensible Parametric HRF Estimation for fMRI Data
+Version: 0.1.0
+Authors@R: 
+    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
+           comment = c(ORCID = "YOUR-ORCID-ID"))
+Description: Provides robust and efficient tools for estimating parameters of 
+    parametric Hemodynamic Response Function (HRF) models from fMRI data. Using 
+    an iterative linear Taylor approximation method, it enables voxel-wise 
+    estimation of interpretable HRF parameters (e.g., lag, width, undershoot 
+    amplitude) with uncertainty quantification. The package is designed for 
+    extensibility, initially focusing on the Lag-Width-Undershoot (LWU) model 
+    while providing a framework for incorporating additional parametric models.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.0
+Depends:
+    R (>= 4.1.0)
+Imports:
+    fmrireg (>= 0.2.0),
+    Matrix,
+    RcppEigen,
+    methods,
+    stats
+Suggests:
+    future,
+    progressr,
+    ggplot2,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown
+Config/testthat/edition: 3
+VignetteBuilder: knitr
+URL: https://github.com/bbuchsbaum/fmriparametry
+BugReports: https://github.com/bbuchsbaum/fmriparametry/issues 
+Remotes:
+    bbuchsbaum/fmrireg
