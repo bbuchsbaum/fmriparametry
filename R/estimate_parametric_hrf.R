@@ -1,8 +1,8 @@
 #' Estimate parametric HRF parameters
 #'
-#' Main user-facing function that performs parameteric HRF estimation. This
-#' implementation only performs argument validation and resolution of HRF
-#' interfaces.  The fitting engine itself will be implemented in later tickets.
+#' Main user-facing function that performs parametric HRF estimation.  This
+#' integrates input validation, data preparation, the core fitting engine and
+#' construction of the return object.
 #'
 #' @param fmri_data fMRI dataset object (placeholder in this sprint)
 #' @param event_model Event model describing stimulus timing
@@ -17,7 +17,7 @@
 #' @param mask Optional mask for spatial subsetting
 #' @param verbose Logical; print progress messages
 #'
-#' @return A placeholder object containing the validated arguments
+#' @return An object of class `parametric_hrf_fit`
 #' @export
 estimate_parametric_hrf <- function(
   fmri_data,
@@ -86,22 +86,43 @@ estimate_parametric_hrf <- function(
   assertthat::assert_that(is.numeric(lambda_ridge), length(lambda_ridge) == 1, lambda_ridge >= 0)
   assertthat::assert_that(is.logical(verbose), length(verbose) == 1)
 
-  result <- list(
+  if (verbose) message("Preparing inputs...")
+  prepared <- .prepare_parametric_inputs(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = parametric_hrf,
-    theta_seed = theta_seed,
-    theta_bounds = theta_bounds,
     confound_formula = confound_formula,
     baseline_model = baseline_model,
     hrf_eval_times = hrf_eval_times,
     hrf_span = hrf_span,
-    lambda_ridge = lambda_ridge,
-    mask = mask,
-    verbose = verbose,
-    hrf_interface = hrf_interface
+    mask = mask
   )
-  class(result) <- "parametric_hrf_fit_placeholder"
-  result
+
+  if (verbose) message("Running parametric engine...")
+  fit_res <- .parametric_engine(
+    Y_proj = prepared$Y_proj,
+    S_target_proj = prepared$S_target_proj,
+    scan_times = prepared$scan_times,
+    hrf_eval_times = prepared$hrf_eval_times,
+    hrf_interface = hrf_interface,
+    theta_seed = theta_seed,
+    theta_bounds = theta_bounds,
+    lambda_ridge = lambda_ridge
+  )
+
+  if (verbose) message("Constructing output...")
+  new_parametric_hrf_fit(
+    estimated_parameters = fit_res$theta_hat,
+    amplitudes = fit_res$beta0,
+    parameter_names = hrf_interface$parameter_names,
+    hrf_model = parametric_hrf,
+    convergence = list(),
+    metadata = list(
+      call = match.call(),
+      n_voxels = ncol(prepared$Y_raw),
+      n_timepoints = nrow(prepared$Y_raw),
+      theta_seed = theta_seed,
+      theta_bounds = theta_bounds
+    )
+  )
 }
 
