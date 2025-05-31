@@ -6,6 +6,11 @@
 **Start Date:** [TBD]  
 **End Date:** [TBD]
 
+## find information about fmrireg and neuroim2 in cheatsheets
+
+data-raw/fmrireg_cheatsheet.md
+data-raw/neuroim2_cheatsheet.md
+
 ### Sprint Goal
 Implement a minimal, functional version of `estimate_parametric_hrf` that can fit the Lag-Width-Undershoot (LWU) HRF model to voxel data using a single Taylor expansion pass. This sprint focuses on establishing the core infrastructure and basic functionality without advanced optimization features.
 
