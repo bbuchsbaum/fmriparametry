@@ -1,5 +1,10 @@
 # Sprint 3: Advanced Robustness Features and Production Readiness
 
+## find information about fmrireg and neuroim2 in cheatsheets
+
+data-raw/fmrireg_cheatsheet.md
+data-raw/neuroim2_cheatsheet.md
+
 ## Sprint Overview
 
 **Duration:** 2 weeks  

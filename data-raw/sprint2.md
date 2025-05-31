@@ -1,6 +1,13 @@
 
 # Sprint 2: Iterative Refinement, Diagnostics, and Performance
 
+
+## find information about fmrireg and neuroim2 in cheatsheets
+
+data-raw/fmrireg_cheatsheet.md
+data-raw/neuroim2_cheatsheet.md
+
+
 ## Sprint Overview
 
 **Duration:** 2 weeks  

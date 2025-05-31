@@ -328,3 +328,8 @@ voxel_se <- sqrt(diag(vcov(fit, voxel_index = 1000)))
 The `fmriparametric` package fills a critical gap in the fMRI analysis ecosystem by providing efficient, robust tools for parametric HRF estimation. By building on the `fmrireg` foundation and implementing state-of-the-art optimization techniques, it enables researchers to extract physiologically meaningful parameters from their fMRI data while maintaining computational efficiency for whole-brain analyses.
 
 The extensible architecture ensures that the package can grow to accommodate new HRF models and analysis techniques as the field evolves, making it a valuable long-term investment for the neuroimaging community.
+
+## find information about fmrireg and neuroim2 in cheatsheets
+
+data-raw/fmrireg_cheatsheet.md
+data-raw/neuroim2_cheatsheet.md
