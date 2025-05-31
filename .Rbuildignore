@@ -1,0 +1,4 @@
+^data-raw$
+^tests$
+^.gitlab-ci.yml$
+^.github$

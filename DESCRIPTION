@@ -21,6 +21,7 @@ Depends:
     R (>= 4.1.0)
 Imports:
     fmrireg (>= 0.2.0),
+    assertthat,
     Matrix,
     RcppEigen,
     methods,
@@ -29,6 +30,7 @@ Suggests:
     future,
     progressr,
     ggplot2,
+    numDeriv,
     testthat (>= 3.0.0),
     knitr,
     rmarkdown
