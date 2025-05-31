@@ -1,0 +1,96 @@
+#' Prepare data and design matrices for parametric fitting
+#'
+#' Internal helper that extracts BOLD data, constructs stimulus regressors
+#' and projects out confounds.
+#'
+#' @param fmri_data Matrix or dataset-like object
+#' @param event_model Matrix or object convertible to design matrix
+#' @param confound_formula Optional formula for confound regressors
+#' @param baseline_model Baseline model specification (unused placeholder)
+#' @param hrf_eval_times Optional vector of HRF evaluation times
+#' @param hrf_span Span for HRF evaluation grid when `hrf_eval_times` is NULL
+#' @param mask Optional logical vector selecting voxels
+#'
+#' @return List with projected data, design matrices and timing vectors
+#' @keywords internal
+.prepare_parametric_inputs <- function(
+  fmri_data,
+  event_model,
+  confound_formula = NULL,
+  baseline_model = "intercept",
+  hrf_eval_times = NULL,
+  hrf_span = 30,
+  mask = NULL
+) {
+  # Step 1: extract data matrix and scan times
+  if (is.matrix(fmri_data)) {
+    Y_raw <- fmri_data
+    scan_times <- seq_len(nrow(Y_raw))
+  } else if (is.list(fmri_data) && !is.null(fmri_data$data)) {
+    Y_raw <- fmri_data$data
+    scan_times <- fmri_data$scan_times
+    if (is.null(scan_times)) {
+      scan_times <- seq_len(nrow(Y_raw))
+    }
+  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
+             utils::hasName(attributes(fmri_data), "class")) {
+    Y_raw <- fmrireg::get_data_matrix(fmri_data, mask = mask)
+    scan_times <- fmrireg::scan_times(fmri_data)
+  } else {
+    stop("Unsupported fmri_data type", call. = FALSE)
+  }
+
+  if (!is.null(mask) && is.logical(mask)) {
+    Y_raw <- Y_raw[, mask, drop = FALSE]
+  }
+
+  # Step 2: stimulus design matrix
+  if (is.matrix(event_model)) {
+    S_target <- event_model
+  } else if (is.list(event_model) && !is.null(event_model$design_matrix)) {
+    S_target <- event_model$design_matrix
+  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
+             exists("design_matrix", envir = asNamespace("fmrireg"))) {
+    S_target <- fmrireg::design_matrix(event_model)
+  } else {
+    stop("Unsupported event_model type", call. = FALSE)
+  }
+  if (nrow(S_target) != length(scan_times)) {
+    stop("event_model design matrix has wrong number of rows", call. = FALSE)
+  }
+
+  # Step 3: confound matrix
+  if (is.null(confound_formula)) {
+    Z <- NULL
+  } else {
+    df_tmp <- data.frame(scan = scan_times)
+    Z <- stats::model.matrix(confound_formula, data = df_tmp)
+  }
+
+  # Step 4: project out confounds
+  if (!is.null(Z)) {
+    qr_Z <- qr(Z)
+    Q <- qr.Q(qr_Z)
+    Y_proj <- Y_raw - Q %*% (t(Q) %*% Y_raw)
+    S_target_proj <- S_target - Q %*% (t(Q) %*% S_target)
+  } else {
+    Y_proj <- Y_raw
+    S_target_proj <- S_target
+  }
+
+  # Step 5: HRF evaluation times
+  if (is.null(hrf_eval_times)) {
+    dt <- if (length(scan_times) > 1) median(diff(scan_times)) else 1
+    hrf_eval_times <- seq(0, hrf_span, by = dt)
+  }
+
+  list(
+    Y_raw = Y_raw,
+    Y_proj = Y_proj,
+    S_target = S_target,
+    S_target_proj = S_target_proj,
+    Z = Z,
+    scan_times = scan_times,
+    hrf_eval_times = hrf_eval_times
+  )
+}
