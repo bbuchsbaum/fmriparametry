@@ -1,3 +1,7 @@
 export(hello)
 
 export(estimate_parametric_hrf)
+
+S3method(print,parametric_hrf_fit)
+S3method(coef,parametric_hrf_fit)
+S3method(summary,parametric_hrf_fit)
