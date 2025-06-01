@@ -52,21 +52,42 @@ estimate_parametric_hrf_ultimate <- function(
   return_diagnostics = TRUE,
   verbose = TRUE
 ) {
-  
-  # This function would integrate ALL features from v2, v3, and rock_solid
-  # into a single, coherent interface
-  
-  # Architecture:
-  # 1. Input validation (from engineering-standards.R)
-  # 2. Data preparation (from prepare-parametric-inputs.R)
-  # 3. Initial estimation (parametric-engine.R)
-  # 4. K-means clustering if requested (from v2)
-  # 5. Iterative refinement if requested (from v2)
-  # 6. Tiered refinement if requested (from v3)
-  # 7. Standard errors (Delta method)
-  # 8. Create parametric_hrf_fit object with ALL information
-  
-  # Key: ONE function, ALL features, CLEAN interface
+  refinement_strategy <- match.arg(refinement_strategy)
+
+  # Map arguments to the main implementation in estimate_parametric_hrf
+  kmeans_ref <- !is.null(kmeans_clusters)
+  kmeans_k <- if (is.null(kmeans_clusters)) 5 else kmeans_clusters
+  kmeans_passes <- if (kmeans_ref) 2 else 0
+
+  fit <- estimate_parametric_hrf(
+    fmri_data = fmri_data,
+    event_model = event_model,
+    parametric_hrf = parametric_hrf,
+    theta_seed = theta_seed,
+    theta_bounds = theta_bounds,
+    confound_formula = confound_formula,
+    baseline_model = baseline_model,
+    hrf_eval_times = hrf_eval_times,
+    hrf_span = hrf_span,
+    lambda_ridge = lambda_ridge,
+    mask = mask,
+    global_refinement = iterative_recentering,
+    global_passes = max_iterations,
+    convergence_epsilon = convergence_tol,
+    kmeans_refinement = kmeans_ref,
+    kmeans_k = kmeans_k,
+    kmeans_passes = kmeans_passes,
+    tiered_refinement = refinement_strategy,
+    refinement_thresholds = refinement_opts,
+    parallel = parallel,
+    n_cores = n_cores,
+    compute_se = compute_standard_errors,
+    safety_mode = "balanced",
+    progress = return_diagnostics,
+    verbose = verbose
+  )
+
+  fit
 }
 
 # STEP 2: Performance Optimizations (Easy Wins)
