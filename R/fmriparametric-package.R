@@ -81,7 +81,7 @@ if(getRversion() >= "2.15.1") {
 }
 
 # Initialize package options
-.onLoad <- function(libname, pkgname) {
+.on_load_options <- function(libname, pkgname) {
   op <- options()
   op.fmrip <- list(
     fmriparametric.refine_global = TRUE

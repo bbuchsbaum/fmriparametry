@@ -8,7 +8,10 @@
 #' @param amplitudes numeric vector of fitted amplitudes
 #' @param parameter_names character vector naming the parameters
 #' @param hrf_model character string identifying the HRF model
-#' @param convergence list of convergence diagnostics (optional)
+#' @param r_squared optional numeric vector of R-squared values
+#' @param residuals optional numeric matrix of residuals
+#' @param parameter_ses optional numeric matrix of parameter standard errors
+#' @param convergence_info list of convergence diagnostics
 #' @param metadata list containing additional metadata such as the call,
 #'   number of voxels and time points, the parameter seed and bounds
 #'
@@ -19,7 +22,10 @@ new_parametric_hrf_fit <- function(
   amplitudes,
   parameter_names,
   hrf_model = "lwu",
-  convergence = list(),
+  r_squared = NULL,
+  residuals = NULL,
+  parameter_ses = NULL,
+  convergence_info = list(),
   metadata = list(),
   ...  # Ignore any extra arguments for backward compatibility
 ) {
@@ -29,7 +35,20 @@ new_parametric_hrf_fit <- function(
   assertthat::assert_that(is.character(parameter_names))
   assertthat::assert_that(ncol(estimated_parameters) == length(parameter_names))
   assertthat::assert_that(is.character(hrf_model), length(hrf_model) == 1)
-  assertthat::assert_that(is.list(convergence))
+  if (!is.null(r_squared)) {
+    assertthat::assert_that(is.numeric(r_squared),
+                            length(r_squared) == nrow(estimated_parameters))
+  }
+  if (!is.null(residuals)) {
+    assertthat::assert_that(is.matrix(residuals),
+                            ncol(residuals) == nrow(estimated_parameters))
+  }
+  if (!is.null(parameter_ses)) {
+    assertthat::assert_that(is.matrix(parameter_ses),
+                            nrow(parameter_ses) == nrow(estimated_parameters),
+                            ncol(parameter_ses) == length(parameter_names))
+  }
+  assertthat::assert_that(is.list(convergence_info))
   assertthat::assert_that(is.list(metadata))
 
   meta_defaults <- list(
@@ -50,9 +69,15 @@ new_parametric_hrf_fit <- function(
     amplitudes = as.numeric(amplitudes),
     parameter_names = parameter_names,
     hrf_model = hrf_model,
-    convergence = convergence,
+    r_squared = r_squared,
+    residuals = residuals,
+    parameter_ses = parameter_ses,
+    convergence_info = convergence_info,
     metadata = metadata
   )
+  # Backward compatibility aliases
+  obj$parameters <- obj$estimated_parameters
+  obj$convergence <- obj$convergence_info
   class(obj) <- "parametric_hrf_fit"
   obj
 }

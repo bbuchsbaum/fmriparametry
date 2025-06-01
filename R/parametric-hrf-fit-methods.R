@@ -1,113 +1,134 @@
-#' Print a parametric_hrf_fit object
+#' Methods for parametric_hrf_fit objects
 #'
-#' Displays a concise summary of the parametric HRF fit including the HRF model 
-#' used, number of voxels analyzed, and basic summary statistics for each 
-#' estimated parameter.
+#' These S3 methods provide a unified user interface for objects returned by
+#' `estimate_parametric_hrf()` and related functions.
 #'
-#' @param x An object of class \code{parametric_hrf_fit}, typically from 
-#'   \code{\link{estimate_parametric_hrf}}.
-#' @param ... Additional arguments (currently ignored).
-#' 
-#' @return The input object \code{x} invisibly.
-#' 
-#' @examples
-#' \dontrun{
-#' # Fit a model
-#' fit <- estimate_parametric_hrf(fmri_data, event_model)
-#' 
-#' # Print summary
-#' print(fit)
-#' # or simply:
-#' fit
-#' }
-#' 
-#' @seealso \code{\link{estimate_parametric_hrf}}, \code{\link{summary.parametric_hrf_fit}}
-#' 
+#' @name parametric_hrf_fit-methods
+NULL
+
+#' Pretty printing for parametric_hrf_fit
+#'
+#' Provides a concise summary of the fit using `cli`/`pillar` when available.
+#'
+#' @param x A \code{parametric_hrf_fit} object.
+#' @param ... Additional arguments (ignored).
+#' @return The input object invisibly.
 #' @export
 print.parametric_hrf_fit <- function(x, ...) {
-  cat("Parametric HRF Fit\n")
-  cat("Model:", x$hrf_model, "\n")
-  cat("Voxels:", nrow(x$estimated_parameters), "\n")
-  cat("\nParameter Summary:\n")
-  print(summary(x$estimated_parameters))
+  have_cli <- requireNamespace("cli", quietly = TRUE) &&
+    requireNamespace("pillar", quietly = TRUE)
+
+  summ <- summary(x)
+
+  if (have_cli) {
+    cli::cli_h1("Parametric HRF Fit")
+    cli::cli_text("Model: {.val {x$hrf_model}}")
+    cli::cli_text("Voxels: {n_voxels(x)}")
+    cli::cli_h2("Summary")
+    print(summ)
+  } else {
+    cat("Parametric HRF Fit\n")
+    cat("Model:", x$hrf_model, "\n")
+    cat("Voxels:", n_voxels(x), "\n\n")
+    print(summ)
+  }
   invisible(x)
 }
 
-#' Extract coefficients from a parametric_hrf_fit object
+#' Coefficients from a parametric_hrf_fit
 #'
-#' Returns the matrix of estimated HRF parameters for each voxel. Each row 
-#' corresponds to a voxel and each column to a parameter.
-#'
-#' @param object An object of class \code{parametric_hrf_fit}, typically from 
-#'   \code{\link{estimate_parametric_hrf}}.
-#' @param ... Additional arguments (currently ignored).
-#' 
-#' @return A numeric matrix with dimensions (n_voxels × n_parameters). For the 
-#'   LWU model, columns are named \code{"tau"}, \code{"sigma"}, and \code{"rho"}.
-#' 
-#' @examples
-#' \dontrun{
-#' # Fit a model
-#' fit <- estimate_parametric_hrf(fmri_data, event_model)
-#' 
-#' # Extract parameters
-#' params <- coef(fit)
-#' 
-#' # Get parameters for specific voxel
-#' voxel_100_params <- params[100, ]
-#' 
-#' # Summary statistics for each parameter
-#' apply(params, 2, summary)
-#' }
-#' 
-#' @seealso \code{\link{estimate_parametric_hrf}}, \code{\link{summary.parametric_hrf_fit}}
-#' 
+#' @param object A \code{parametric_hrf_fit} object.
+#' @param type Which coefficients to return: "parameters", "amplitude", or "se".
+#' @param ... Additional arguments (ignored).
+#' @return Numeric matrix or vector depending on \code{type}.
 #' @export
-coef.parametric_hrf_fit <- function(object, ...) {
-  object$estimated_parameters
+coef.parametric_hrf_fit <- function(object,
+                                   type = c("parameters", "amplitude", "se"),
+                                   ...) {
+  type <- match.arg(type)
+  switch(type,
+         parameters = object$estimated_parameters,
+         amplitude = object$amplitudes,
+         se = {
+           if (is.null(object$parameter_ses)) {
+             warning("Standard errors not available")
+             NULL
+           } else {
+             object$parameter_ses
+           }
+         })
 }
 
-#' Summarize a parametric_hrf_fit object
+#' Summarize a parametric_hrf_fit
 #'
-#' Produces comprehensive summary statistics of the estimated HRF parameters and 
-#' response amplitudes across all voxels.
+#' Returns a tidy data.frame of summary statistics for each parameter,
+#' amplitudes, and R-squared values when available.
 #'
-#' @param object An object of class \code{parametric_hrf_fit}, typically from 
-#'   \code{\link{estimate_parametric_hrf}}.
-#' @param ... Additional arguments (currently ignored).
-#' 
-#' @return A list containing:
-#'   \item{parameter_summary}{Matrix with summary statistics (min, 1st quartile, 
-#'     median, mean, 3rd quartile, max) for each parameter}
-#'   \item{amplitude_summary}{Vector of summary statistics for response amplitudes}
-#'   \item{hrf_model}{Character string identifying the HRF model used}
-#'   \item{n_voxels}{Integer number of voxels analyzed}
-#' 
-#' @examples
-#' \dontrun{
-#' # Fit a model
-#' fit <- estimate_parametric_hrf(fmri_data, event_model)
-#' 
-#' # Get summary
-#' summ <- summary(fit)
-#' 
-#' # View parameter summaries
-#' summ$parameter_summary
-#' 
-#' # Check amplitude distribution
-#' summ$amplitude_summary
-#' }
-#' 
-#' @seealso \code{\link{estimate_parametric_hrf}}, \code{\link{coef.parametric_hrf_fit}}
-#' 
+#' @param object A \code{parametric_hrf_fit} object.
+#' @param ... Additional arguments (ignored).
+#' @return A data.frame with summary statistics and attributes `hrf_model`
+#'   and `n_voxels`.
 #' @export
 summary.parametric_hrf_fit <- function(object, ...) {
-  param_sum <- apply(object$estimated_parameters, 2, summary)
-  amp_sum <- summary(object$amplitudes)
-  list(
-    parameter_summary = param_sum,
-    amplitude_summary = amp_sum,
-    hrf_model = object$hrf_model,
-    n_voxels = n_voxels(object)
-  )
+  stat_vec <- function(v) {
+    qs <- stats::quantile(v, c(0, 0.25, 0.5, 0.75, 1), na.rm = TRUE)
+    c(min = qs[1], q1 = qs[2], median = qs[3], mean = mean(v, na.rm = TRUE),
+      q3 = qs[4], max = qs[5])
+  }
+
+  param_stats <- t(apply(object$estimated_parameters, 2, stat_vec))
+  df <- data.frame(parameter = rownames(param_stats), param_stats,
+                   row.names = NULL, check.names = FALSE)
+
+  amp_stats <- stat_vec(object$amplitudes)
+  df <- rbind(df, data.frame(parameter = "amplitude", t(amp_stats)))
+
+  if (!is.null(object$r_squared)) {
+    r2_stats <- stat_vec(object$r_squared)
+    df <- rbind(df, data.frame(parameter = "r_squared", t(r2_stats)))
+  }
+
+  attr(df, "hrf_model") <- object$hrf_model
+  attr(df, "n_voxels") <- n_voxels(object)
+  class(df) <- c("summary_parametric_hrf_fit", "data.frame")
+  df
+}
+
+#' @export
+print.summary_parametric_hrf_fit <- function(x, ...) {
+  have_cli <- requireNamespace("cli", quietly = TRUE) &&
+    requireNamespace("pillar", quietly = TRUE)
+
+  if (have_cli) {
+    cli::cli_h1("Parametric HRF Summary")
+    cli::cli_text("Model: {.val {attr(x, 'hrf_model')}}")
+    cli::cli_text("Voxels: {attr(x, 'n_voxels')}")
+    pillar::print_table(x)
+  } else {
+    cat("Parametric HRF Summary\n")
+    cat("Model:", attr(x, "hrf_model"), "\n")
+    cat("Voxels:", attr(x, "n_voxels"), "\n\n")
+    print.data.frame(x, row.names = FALSE)
+  }
+  invisible(x)
+}
+
+#' @export
+fitted.parametric_hrf_fit <- function(object, Y_proj = NULL, ...) {
+  if (!is.null(object$residuals)) {
+    if (is.null(Y_proj)) {
+      stop("Y_proj required to compute fitted values from residuals")
+    }
+    return(Y_proj - object$residuals)
+  }
+  stop("Cannot compute fitted values without residuals")
+}
+
+#' @export
+residuals.parametric_hrf_fit <- function(object, ...) {
+  if (is.null(object$residuals)) {
+    warning("Residuals not stored in fit object")
+    return(NULL)
+  }
+  object$residuals
 }
