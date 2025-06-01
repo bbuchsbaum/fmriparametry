@@ -23,7 +23,7 @@
       last_error <<- e
       NULL
     }, warning = function(w) {
-      if (verbose) message(error_prefix, " warning: ", w$message)
+      if (verbose) .diag_warn("%s warning: %s", error_prefix, w$message)
       invokeRestart("muffleWarning")
     })
     
@@ -40,15 +40,15 @@
   # Primary failed, try fallback
   if (!is.null(fallback_fn)) {
     if (verbose) {
-      message(error_prefix, " failed with: ", last_error$message, 
-              ". Trying fallback method.")
+      .diag_inform("%s failed with: %s. Trying fallback method.",
+                   error_prefix, last_error$message)
     }
     
     result <- tryCatch({
       fallback_fn()
     }, error = function(e) {
       if (verbose) {
-        message("Fallback also failed: ", e$message)
+        .diag_inform("Fallback also failed: %s", e$message)
       }
       NULL
     })
@@ -60,7 +60,7 @@
   
   # Everything failed, return default
   if (verbose) {
-    message(error_prefix, " failed completely. Returning default value.")
+    .diag_inform("%s failed completely. Returning default value.", error_prefix)
   }
   
   if (is.null(default_value)) {
@@ -191,8 +191,9 @@
   results <- vector("list", n_voxels)
   failed_voxels <- integer(0)
   
-  if (progress && n_voxels > 100) {
-    cat("Processing", n_voxels, "voxels...\n")
+  p <- NULL
+  if (progress && n_voxels > 0) {
+    p <- .diag_progressor(n_voxels)
   }
   
   for (i in seq_along(voxel_indices)) {
@@ -211,16 +212,16 @@
       )
     })
     
-    if (progress && i %% 1000 == 0) {
-      cat("  Processed", i, "/", n_voxels, "voxels (",
-          round(100 * i / n_voxels), "% complete)\n")
-    }
+    if (!is.null(p)) p(message = NULL, amount = 1)
   }
   
   if (length(failed_voxels) > 0) {
-    warning("Processing failed for ", length(failed_voxels), " voxels: ",
-            paste(head(failed_voxels, 10), collapse = ", "),
-            if (length(failed_voxels) > 10) "..." else "")
+    .diag_warn(
+      "Processing failed for %d voxels: %s%s",
+      length(failed_voxels),
+      paste(head(failed_voxels, 10), collapse = ", "),
+      if (length(failed_voxels) > 10) "..." else ""
+    )
   }
   
   # Combine results if requested

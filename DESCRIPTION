@@ -21,6 +21,7 @@ Depends:
     R (>= 4.1.0)
 Imports:
     fmrireg (>= 0.1.0),
+    rlang,
     assertthat,
     Matrix,
     RcppEigen,

@@ -277,7 +277,10 @@
 
 # Helper function for performance verbosity
 verbose_performance <- function() {
-  getOption("fmriparametric.performance.verbose", FALSE)
+  getOption(
+    "fmriparametric.performance.verbose",
+    getOption("fmriparametric.verbose", FALSE)
+  )
 }
 
 # Performance monitoring utilities
