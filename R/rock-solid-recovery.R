@@ -106,9 +106,6 @@
   # Level 1: Try full iterative estimation
   result <- .try_with_recovery(
     primary_fn = function() {
-      source(file.path(dirname(getwd()), "R", "parametric-engine-iterative.R"), 
-             local = TRUE)
-      
       .parametric_engine_iterative(
         Y_proj = Y_proj,
         S_target_proj = S_target_proj,
@@ -132,9 +129,6 @@
   # Level 2: Try single-pass estimation
   result <- .try_with_recovery(
     primary_fn = function() {
-      source(file.path(dirname(getwd()), "R", "parametric-engine.R"), 
-             local = TRUE)
-      
       basic_result <- .parametric_engine(
         Y_proj = Y_proj,
         S_target_proj = S_target_proj,

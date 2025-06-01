@@ -265,3 +265,28 @@ set_engineering_options <- function(verbose = FALSE, validate = TRUE,
 
 # Utility operator
 `%||%` <- function(x, y) if (is.null(x)) y else x
+# Deprecated wrappers ------------------------------------------------------
+
+#' @keywords internal
+estimate_parametric_hrf_v2 <- function(...) {
+  .deprecated_version_warning()
+  estimate_parametric_hrf(...)
+}
+
+#' @keywords internal
+estimate_parametric_hrf_v3 <- function(...) {
+  .deprecated_version_warning()
+  estimate_parametric_hrf(...)
+}
+
+#' @keywords internal
+estimate_parametric_hrf_rock_solid <- function(...) {
+  .deprecated_version_warning()
+  estimate_parametric_hrf(...)
+}
+
+#' @keywords internal
+estimate_parametric_hrf_ultimate <- function(...) {
+  .deprecated_version_warning()
+  estimate_parametric_hrf(...)
+}
