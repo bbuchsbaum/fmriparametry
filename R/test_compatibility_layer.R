@@ -161,38 +161,6 @@
   invisible(TRUE)
 }
 
-.get_available_memory <- function() {
-  # Simple fallback - return a reasonable value
-  return(8e9)  # 8GB
-}
-
-.check_memory_available <- function(required_bytes, operation) {
-  available <- .get_available_memory()
-  
-  if (required_bytes > available * 0.8) {
-    warning(sprintf("Operation '%s' requires %.1f GB but only %.1f GB available",
-                    operation, required_bytes/1e9, available/1e9))
-    return(FALSE)
-  }
-  return(TRUE)
-}
-
-.try_with_context <- function(expr, context = "operation", fallback = NULL) {
-  tryCatch({
-    expr
-  }, error = function(e) {
-    if (!is.null(fallback)) {
-      tryCatch({
-        fallback
-      }, error = function(e2) {
-        stop(sprintf("Error in %s: %s. Fallback also failed: %s", 
-                     context, e$message, e2$message))
-      })
-    } else {
-      stop(sprintf("Error in %s: %s", context, e$message))
-    }
-  })
-}
 
 .assert_output_quality <- function(results, checks) {
   if (!is.null(checks$finite) && checks$finite) {
