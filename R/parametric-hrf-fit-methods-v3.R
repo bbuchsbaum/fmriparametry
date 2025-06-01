@@ -260,7 +260,6 @@ plot.parametric_hrf_fit <- function(x,
   
   # Load HRF function
   if (x$hrf_model == "lwu") {
-    source(system.file("R", "hrf-interface-lwu.R", package = "fmriparametric"), local = TRUE)
     hrf_fn <- .lwu_hrf_function
   }
   

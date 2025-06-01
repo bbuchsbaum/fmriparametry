@@ -49,9 +49,6 @@
   validate = TRUE
 ) {
   
-  # Load engineering standards
-  source(file.path(dirname(getwd()), "R", "engineering-standards.R"), local = TRUE)
-  
   # Start timing
   total_time <- system.time({
     
