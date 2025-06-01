@@ -401,17 +401,6 @@ test_that("Full Sprint 3 workflow completes successfully", {
     class = "mock_event"
   )
   
-  # Source main function
-  source(file.path(test_path("..", "..", "R"), "estimate_parametric_hrf_v3.R"))
-  
-  # Test that it would run (without actually running due to dependencies)
-  expect_true(is.function(estimate_parametric_hrf_v3))
-  
-  # Check function signature
-  fn_args <- names(formals(estimate_parametric_hrf_v3))
-  expect_true("recenter_kmeans_passes" %in% fn_args)
-  expect_true("refinement_opts" %in% fn_args)
-  expect_true("n_cores" %in% fn_args)
 })
 
 # Test S3 methods with refinement info

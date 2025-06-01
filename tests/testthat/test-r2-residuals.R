@@ -165,10 +165,11 @@ test_that("residuals method works with fit object", {
   S <- matrix(rbinom(20, 1, 0.3), ncol = 1)
   
   # Create fit object
-  fit <- estimate_parametric_hrf_v2(
+  fit <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = S,
-    recenter_global_passes = 1,
+    global_refinement = TRUE,
+    global_passes = 1,
     compute_se = FALSE,
     verbose = FALSE
   )

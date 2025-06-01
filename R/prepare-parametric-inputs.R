@@ -26,32 +26,36 @@
   if (is.matrix(fmri_data)) {
     Y_raw <- fmri_data
     scan_times <- seq_len(nrow(Y_raw))
+  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
+             inherits(fmri_data, c("fmri_dataset", "matrix_dataset"))) {
+    Y_raw <- fmrireg::get_data_matrix(fmri_data, mask = mask)
+    scan_times <- fmrireg::scan_times(fmri_data)
+    if (is.null(scan_times)) {
+      scan_times <- seq_len(nrow(Y_raw))
+    }
   } else if (is.list(fmri_data) && !is.null(fmri_data$data)) {
     Y_raw <- fmri_data$data
     scan_times <- fmri_data$scan_times
     if (is.null(scan_times)) {
       scan_times <- seq_len(nrow(Y_raw))
     }
-  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
-             utils::hasName(attributes(fmri_data), "class")) {
-    Y_raw <- fmrireg::get_data_matrix(fmri_data, mask = mask)
-    scan_times <- fmrireg::scan_times(fmri_data)
+    if (!is.null(mask) && is.logical(mask)) {
+      Y_raw <- Y_raw[, mask, drop = FALSE]
+    }
   } else {
     stop("Unsupported fmri_data type", call. = FALSE)
   }
 
-  if (!is.null(mask) && is.logical(mask)) {
-    Y_raw <- Y_raw[, mask, drop = FALSE]
-  }
+
 
   # Step 2: stimulus design matrix
   if (is.matrix(event_model)) {
     S_target <- event_model
+  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
+             inherits(event_model, "event_model")) {
+    S_target <- fmrireg::design_matrix(event_model)
   } else if (is.list(event_model) && !is.null(event_model$design_matrix)) {
     S_target <- event_model$design_matrix
-  } else if (requireNamespace("fmrireg", quietly = TRUE) &&
-             exists("design_matrix", envir = asNamespace("fmrireg"))) {
-    S_target <- fmrireg::design_matrix(event_model)
   } else {
     stop("Unsupported event_model type", call. = FALSE)
   }

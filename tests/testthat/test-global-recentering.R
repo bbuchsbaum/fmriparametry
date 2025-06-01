@@ -165,12 +165,13 @@ test_that("data_median initialization works correctly", {
   )
   class(fmri_data) <- c("matrix_dataset", "list")
   
-  # Test with estimate_parametric_hrf_v2
-  fit <- estimate_parametric_hrf_v2(
+  # Test with consolidated estimator
+  fit <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_model,
     theta_seed = "data_median",
-    recenter_global_passes = 2,
+    global_refinement = TRUE,
+    global_passes = 2,
     verbose = FALSE
   )
   
