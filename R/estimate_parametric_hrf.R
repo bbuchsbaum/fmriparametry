@@ -626,11 +626,7 @@ estimate_parametric_hrf <- function(
       lambda_ridge = lambda_ridge,
       verbose = FALSE
     )
-##<<<<<<< 65zmk7-codex/fix-merge-conflicts-in-estimate_parametric_hrf.r
-    list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0)
-##=======
     list(list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0))
-##>>>>>>> main
   }
 
   # Run using the generic parallel backend
