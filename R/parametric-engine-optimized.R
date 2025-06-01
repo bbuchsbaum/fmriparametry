@@ -154,25 +154,9 @@
     solution_time <- system.time({
       if (algorithm_options$method == "qr") {
         # QR decomposition (numerically stable)
-        qr_decomp <- qr(design_matrix)
-        Q <- qr.Q(qr_decomp)
-        R <- qr.R(qr_decomp)
-        
-        # Check condition number
-        R_diag <- abs(diag(R))
-        condition <- max(R_diag) / min(R_diag[R_diag > .Machine$double.eps])
-        
-        if (condition > 1e8) {
-          warning(sprintf(
-            "Design matrix is ill-conditioned (kappa = %.2e), adding regularization",
-            condition
-          ))
-          R <- R + algorithm_options$ridge_lambda * diag(ncol(R))
-        }
-        
-        # Solve for all voxels at once
-        R_inv <- backsolve(R, diag(ncol(R)))
-        coefficients <- R_inv %*% crossprod(Q, fmri_data)
+        # Use optimized C++ ridge solver
+        coefficients <- .ridge_linear_solve(design_matrix, fmri_data,
+                                            algorithm_options$ridge_lambda)
         
       } else if (algorithm_options$method == "svd") {
         # SVD solution (most robust but slower)

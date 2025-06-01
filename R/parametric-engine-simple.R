@@ -57,15 +57,8 @@
   }
   
   # QR decomposition with ridge regularization
-  qr_decomp <- qr(X_design)
-  Q <- qr.Q(qr_decomp)
-  R <- qr.R(qr_decomp)
-  
-  # Add ridge penalty to diagonal
-  R_ridge <- R + lambda_ridge * diag(ncol(R))
-  
-  # Solve for coefficients
-  coeffs <- solve(R_ridge) %*% t(Q) %*% Y_proj
+  # Solve linear system with ridge penalty using C++ implementation
+  coeffs <- .ridge_linear_solve(X_design, Y_proj, lambda_ridge)
   
   # Extract amplitudes (first coefficient) and parameter changes
   beta0 <- coeffs[1, ]
