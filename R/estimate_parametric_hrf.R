@@ -472,6 +472,7 @@ estimate_parametric_hrf <- function(
         Y_proj = inputs$Y_proj,
         S_target_proj = inputs$S_target_proj,
         theta_current = theta_current,
+        r_squared = r_squared,
         hrf_interface = hrf_interface,
         hrf_eval_times = inputs$hrf_eval_times,
         local_radius = refinement_thresholds$local_radius,
@@ -495,6 +496,7 @@ estimate_parametric_hrf <- function(
         Y_proj = inputs$Y_proj,
         S_target_proj = inputs$S_target_proj,
         theta_current = theta_current,
+        r_squared = r_squared,
         hrf_interface = hrf_interface,
         hrf_eval_times = inputs$hrf_eval_times,
         max_iter = refinement_thresholds$gauss_newton_maxiter,
@@ -772,71 +774,78 @@ estimate_parametric_hrf <- function(
   return(list(se_theta_hat = se_theta_hat, se_beta0 = se_beta0))
 }
 
-# DATA-DRIVEN INITIALIZATION (improved)
+
+# DATA-DRIVEN INITIALIZATION
 .compute_data_driven_seed <- function(Y, S, hrf_interface) {
-  # Use cross-correlation to estimate time-to-peak
   default_seed <- hrf_interface$default_seed()
-  
-  # Simple heuristic: find delay that maximizes correlation
-  delays <- seq(-5, 15, by = 0.5)
-  correlations <- numeric(length(delays))
-  
-  # Average signal across high-variance voxels
-  voxel_vars <- apply(Y, 2, var)
-  high_var_voxels <- which(voxel_vars > quantile(voxel_vars, 0.8))
-  y_avg <- rowMeans(Y[, high_var_voxels, drop = FALSE])
-  
-  for (i in seq_along(delays)) {
-    # Shift stimulus
-    n_shift <- round(delays[i] / 2)  # Assuming 2s TR
-    if (n_shift >= 0) {
-      s_shifted <- c(rep(0, n_shift), S[, 1])[1:length(S[, 1])]
+  bounds <- hrf_interface$default_bounds()
+
+  # Average high variance voxels
+  vars <- apply(Y, 2, var)
+  idx <- which(vars >= quantile(vars, 0.75))
+  y_mean <- rowMeans(Y[, idx, drop = FALSE])
+
+  # Cross correlation with stimulus
+  lags <- seq(-8, 12, by = 1)
+  cors <- vapply(lags, function(l) {
+    if (l >= 0) {
+      s_shift <- c(rep(0, l), S[, 1])[1:nrow(S)]
     } else {
-      s_shifted <- c(S[, 1], rep(0, -n_shift))[(-n_shift + 1):length(S[, 1])]
+      s_shift <- c(S[, 1], rep(0, -l))[(-l + 1):nrow(S)]
     }
-    
-    correlations[i] <- cor(y_avg, s_shifted, use = "complete.obs")
-  }
-  
-  # Best delay
-  best_delay <- delays[which.max(abs(correlations))]
-  
-  # Update seed
-  new_seed <- default_seed
-  new_seed[1] <- max(0, min(20, best_delay))  # Constrain tau
-  
-  return(new_seed)
+    stats::cor(y_mean, s_shift, use = "complete.obs")
+  }, numeric(1))
+
+  best_lag <- lags[which.max(abs(cors))]
+  tau_est <- default_seed[1] + best_lag
+  tau_est <- max(bounds$lower[1], min(bounds$upper[1], tau_est))
+
+  cors_abs <- abs(cors)
+  half <- max(cors_abs) * 0.5
+  width_idx <- which(cors_abs >= half)
+  sigma_est <- if (length(width_idx) >= 2) diff(range(lags[width_idx]))/2 else default_seed[2]
+  sigma_est <- max(bounds$lower[2], min(bounds$upper[2], sigma_est))
+
+  c(tau_est, sigma_est, default_seed[3])
 }
 
-# IMPROVED K-MEANS INITIALIZATION
+# K-MEANS INITIALIZATION
 .perform_kmeans_initialization <- function(Y, S, k, hrf_interface) {
-  if (k <= 1) {
-    return(list(
-      cluster = rep(1, ncol(Y)),
-      centers = matrix(hrf_interface$default_seed(), nrow = 1)
-    ))
+  n_vox <- ncol(Y)
+  if (k <= 1 || n_vox <= k) {
+    return(list(cluster = rep(1, n_vox),
+                centers = matrix(hrf_interface$default_seed(), nrow = 1)))
   }
-  
-  # Use PCA features for clustering
-  Y_centered <- scale(Y, center = TRUE, scale = FALSE)
-  pca_result <- prcomp(t(Y_centered), rank. = min(k * 2, ncol(Y_centered)))
-  features <- pca_result$x[, 1:min(k, ncol(pca_result$x))]
-  
-  # K-means on PCA features
-  km_result <- kmeans(features, centers = k, nstart = 20, iter.max = 100)
-  
-  # Create parameter centers (vary tau mainly)
-  default_seed <- hrf_interface$default_seed()
-  centers <- matrix(rep(default_seed, k), nrow = k, byrow = TRUE)
-  
-  # Vary tau across clusters
-  tau_range <- seq(4, 8, length.out = k)
-  centers[, 1] <- tau_range
-  
-  return(list(
-    cluster = km_result$cluster,
-    centers = centers
-  ))
+
+  bounds <- hrf_interface$default_bounds()
+  delays <- seq(-8, 12, by = 1)
+  tau_est <- numeric(n_vox)
+
+  for (v in seq_len(n_vox)) {
+    cors <- vapply(delays, function(l) {
+      if (l >= 0) {
+        s_shift <- c(rep(0, l), S[, 1])[1:nrow(S)]
+      } else {
+        s_shift <- c(S[, 1], rep(0, -l))[(-l + 1):nrow(S)]
+      }
+      stats::cor(Y[, v], s_shift, use = "complete.obs")
+    }, numeric(1))
+    tau_est[v] <- delays[which.max(abs(cors))]
+  }
+
+  features <- matrix(tau_est, ncol = 1)
+  km <- kmeans(features, centers = k, nstart = 20, iter.max = 50)
+
+  centers <- matrix(rep(hrf_interface$default_seed(), k), nrow = k, byrow = TRUE)
+  for (cl in seq_len(k)) {
+    idx <- which(km$cluster == cl)
+    if (length(idx) > 0) {
+      centers[cl, 1] <- median(tau_est[idx])
+    }
+  }
+  centers[, 1] <- pmax(bounds$lower[1], pmin(bounds$upper[1], centers[, 1]))
+
+  list(cluster = km$cluster, centers = centers)
 }
 
 .compute_r_squared <- function(Y, Y_pred) {
@@ -862,15 +871,114 @@ estimate_parametric_hrf <- function(
   return(classes)
 }
 
-# Placeholder refinement functions
-.refine_moderate_voxels <- function(...) {
-  # Would implement local re-centering from v3
-  list(theta_refined = theta_current[voxel_idx, ],
-       amplitudes = amplitudes[voxel_idx])
+# Refinement functions
+.refine_moderate_voxels <- function(voxel_idx, Y_proj, S_target_proj,
+                                    theta_current, r_squared,
+                                    hrf_interface, hrf_eval_times,
+                                    local_radius = 1, parallel = FALSE,
+                                    n_cores = 1) {
+
+  if (length(voxel_idx) == 0) {
+    return(list(theta_refined = theta_current[voxel_idx, , drop = FALSE],
+                amplitudes = numeric(0)))
+  }
+
+  bounds <- hrf_interface$default_bounds()
+  n_time <- nrow(Y_proj)
+  n_params <- length(hrf_interface$parameter_names)
+
+  refine_one <- function(v) {
+    theta_v <- theta_current[v, ]
+    basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
+    if (!is.matrix(basis)) {
+      basis <- matrix(basis, ncol = n_params + 1)
+    }
+    X <- matrix(0, n_time, ncol(basis))
+    for (j in seq_len(ncol(basis))) {
+      conv_full <- stats::convolve(S_target_proj[, 1], rev(basis[, j]), type = "open")
+      X[, j] <- conv_full[seq_len(n_time)]
+    }
+    qr_decomp <- qr(X)
+    Q <- qr.Q(qr_decomp)
+    R <- qr.R(qr_decomp)
+    coeffs <- solve(R + 0.01 * diag(ncol(R))) %*% t(Q) %*% Y_proj[, v]
+    beta0_new <- as.numeric(coeffs[1])
+    if (abs(beta0_new) < 1e-6) {
+      return(list(theta = theta_v, amp = beta0_new, r2 = r_squared[v]))
+    }
+    delta <- coeffs[2:(n_params + 1)] / beta0_new
+    theta_new <- theta_v + as.numeric(delta)
+    theta_new <- pmax(bounds$lower, pmin(bounds$upper, theta_new))
+    fitted <- X %*% coeffs
+    r2_new <- 1 - sum((Y_proj[, v] - fitted)^2) / sum((Y_proj[, v] - mean(Y_proj[, v]))^2)
+    if (is.na(r2_new) || r2_new <= r_squared[v]) {
+      return(list(theta = theta_v, amp = beta0_new, r2 = r_squared[v]))
+    }
+    list(theta = theta_new, amp = beta0_new, r2 = r2_new)
+  }
+
+  if (parallel && n_cores > 1 && .Platform$OS.type == "unix") {
+    res_list <- parallel::mclapply(voxel_idx, refine_one, mc.cores = n_cores)
+  } else if (parallel && n_cores > 1) {
+    cl <- parallel::makeCluster(n_cores)
+    res_list <- parallel::parLapply(cl, voxel_idx, refine_one)
+    parallel::stopCluster(cl)
+  } else {
+    res_list <- lapply(voxel_idx, refine_one)
+  }
+
+  theta_out <- theta_current[voxel_idx, , drop = FALSE]
+  amps_out <- numeric(length(voxel_idx))
+  for (i in seq_along(res_list)) {
+    theta_out[i, ] <- res_list[[i]]$theta
+    amps_out[i] <- res_list[[i]]$amp
+  }
+
+  list(theta_refined = theta_out, amplitudes = amps_out)
 }
 
-.refine_hard_voxels <- function(...) {
-  # Would implement Gauss-Newton from v3
-  list(theta_refined = theta_current[voxel_idx, ],
-       amplitudes = amplitudes[voxel_idx])
+.refine_hard_voxels <- function(voxel_idx, Y_proj, S_target_proj,
+                                theta_current, r_squared,
+                                hrf_interface, hrf_eval_times,
+                                max_iter = 5, parallel = FALSE,
+                                n_cores = 1) {
+
+  if (length(voxel_idx) == 0) {
+    return(list(theta_refined = theta_current[voxel_idx, , drop = FALSE],
+                amplitudes = numeric(0)))
+  }
+
+  n_vox <- ncol(Y_proj)
+  bounds <- hrf_interface$default_bounds()
+  queue_labels <- rep("easy", n_vox)
+  queue_labels[voxel_idx] <- "hard_GN"
+
+  gn <- .gauss_newton_refinement(
+    theta_hat_voxel = theta_current,
+    r2_voxel = r_squared,
+    Y_proj = Y_proj,
+    S_target_proj = S_target_proj,
+    scan_times = seq_len(nrow(Y_proj)),
+    hrf_eval_times = hrf_eval_times,
+    hrf_interface = hrf_interface,
+    theta_bounds = bounds,
+    queue_labels = queue_labels,
+    max_iter_gn = max_iter,
+    verbose = FALSE
+  )
+
+  theta_updated <- gn$theta_hat
+
+  n_time <- nrow(Y_proj)
+  amp_fun <- function(v) {
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_updated[v, ])
+    conv_full <- stats::convolve(S_target_proj[, 1], rev(hrf_vals), type = "open")
+    x_pred <- conv_full[seq_len(n_time)]
+    sum(x_pred * Y_proj[, v]) / sum(x_pred^2)
+  }
+
+  amps <- vapply(voxel_idx, amp_fun, numeric(1))
+
+  list(theta_refined = theta_updated[voxel_idx, , drop = FALSE],
+       amplitudes = amps)
 }
