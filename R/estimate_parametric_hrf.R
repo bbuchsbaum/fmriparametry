@@ -614,6 +614,7 @@ estimate_parametric_hrf <- function(
 # ========== HELPER FUNCTION IMPLEMENTATIONS ==========
 
 # MISSING FUNCTION 1: Parallel engine
+
 .parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times,
                                        hrf_interface, theta_seed, theta_bounds,
                                        lambda_ridge = 0.01, parallel_config) {
@@ -623,24 +624,10 @@ estimate_parametric_hrf <- function(
   n_vox <- ncol(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
 
-## <<<<<<< codex/connect-unused-performance-features
   # Processing function for a chunk of voxels
   process_chunk <- function(voxel_idx) {
     res <- .parametric_engine(
       Y_proj = Y_proj[, voxel_idx, drop = FALSE],
-## =======
-  # Determine optimal parallel strategy
-  perf <- .master_performance_dispatcher(n_vox, nrow(Y_proj), verbose = FALSE)
-  if (is.null(n_cores)) {
-    n_cores <- perf$parallel$recommended_cores
-  }
-  par_cfg <- .setup_parallel_backend(if (perf$parallel$use_parallel) n_cores else 1,
-                                     verbose = FALSE)
-
-  process_voxel <- function(idx) {
-    res <- .parametric_engine(
-      Y_proj = Y_proj[, idx, drop = FALSE],
-## >>>>>>> main
       S_target_proj = S_target_proj,
       scan_times = scan_times,
       hrf_eval_times = hrf_eval_times,
@@ -650,7 +637,6 @@ estimate_parametric_hrf <- function(
       lambda_ridge = lambda_ridge,
       verbose = FALSE
     )
-## <<<<<<< codex/connect-unused-performance-features
     list(list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0))
   }
 
@@ -672,24 +658,6 @@ estimate_parametric_hrf <- function(
     beta0[res$indices] <- res$beta0
   }
 
-## =======
-    list(theta_hat = res$theta_hat[1, ], beta0 = res$beta0[1])
-  }
-
-  results <- .parallel_voxel_processing(
-    voxel_indices = seq_len(n_vox),
-    process_function = process_voxel,
-    parallel_config = par_cfg,
-    chunk_size = "auto",
-    progress = FALSE
-  )
-
-  par_cfg$cleanup()
-
-  theta_hat <- matrix(unlist(lapply(results, `[[`, "theta_hat")), n_vox, n_params, byrow = TRUE)
-  beta0 <- vapply(results, `[[`, numeric(1), "beta0")
-
-## >>>>>>> main
   list(theta_hat = theta_hat, beta0 = beta0)
 }
 
