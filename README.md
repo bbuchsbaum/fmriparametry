@@ -92,6 +92,18 @@ fit <- estimate_parametric_hrf(
 )
 ```
 
+### Controlling Global Refinement
+
+By default, Stage 3 global iterative refinement runs automatically. To disable
+it across all calls, set the package option `fmriparametric.refine_global` to
+`FALSE`:
+
+```r
+options(fmriparametric.refine_global = FALSE)
+```
+
+Re-enable by setting the option back to `TRUE`.
+
 ### Working with fmrireg Objects
 
 ```r

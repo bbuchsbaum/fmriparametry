@@ -30,6 +30,11 @@
 #' - Standard errors via Delta method
 #' - R-squared computation
 #' - Residual analysis
+#' 
+#' @section Package Options:
+#' Global iterative refinement (Stage 3) is controlled by the option
+#' `fmriparametric.refine_global`. Set to `FALSE` to disable global re-centering
+#' for all calls.
 #'
 #' @param fmri_data An fMRI dataset object or numeric matrix (timepoints x voxels)
 #' @param event_model Event timing design matrix or event model object
@@ -283,15 +288,23 @@ estimate_parametric_hrf <- function(
   
   # ========== STAGE 3: ITERATIVE REFINEMENT ==========
   convergence_info <- list()
-  
-  if (FALSE && global_refinement && global_passes > 0) {  # Temporarily disabled for stability
+
+  use_global_refinement <- isTRUE(getOption("fmriparametric.refine_global", TRUE))
+
+  if (use_global_refinement && global_refinement && global_passes > 0) {
     if (verbose) cat("\n→ Stage 3: Global iterative refinement...\n")
-    
+
+    best_theta <- theta_current
+    best_amplitudes <- amplitudes
+    best_r2 <- mean(r_squared)
+
     for (iter in seq_len(global_passes)) {
       if (verbose) cat(sprintf("  Iteration %d/%d: ", iter, global_passes))
-      
+
       # Store previous parameters
       theta_prev <- theta_current
+      amplitudes_prev <- amplitudes
+      r_squared_prev <- r_squared
       
       # Re-center globally with bounds enforcement
       theta_center <- apply(theta_current, 2, median)
@@ -348,35 +361,59 @@ estimate_parametric_hrf <- function(
       if (!is.null(theta_bounds)) {
         theta_current <- pmax(theta_bounds$lower, pmin(theta_current, theta_bounds$upper))
       }
-      
-      # Check convergence
+
+      # Check convergence and fit quality
       max_change <- max(abs(theta_current - theta_prev))
       r_squared_new <- .compute_r_squared(
         Y = inputs$Y_proj,
         Y_pred = inputs$S_target_proj %*% iter_result$beta0
       )
-      
-      mean_r2_change <- mean(r_squared_new) - mean(r_squared)
-      r_squared <- r_squared_new
-      
-      if (verbose) {
-        cat(sprintf("Max Δθ = %.4f, Mean R² = %.3f (Δ = %+.4f)\n",
-                    max_change, mean(r_squared), mean_r2_change))
-      }
-      
-      # Store convergence info
-      convergence_info[[paste0("global_iter_", iter)]] <- list(
-        max_param_change = max_change,
-        mean_r2 = mean(r_squared),
-        r2_improvement = mean_r2_change
-      )
-      
-      # Check for convergence
-      if (max_change < convergence_epsilon) {
-        if (verbose) cat("  ✓ Converged!\n")
+
+      mean_r2_change <- mean(r_squared_new) - mean(r_squared_prev)
+
+      if (mean_r2_change < 0) {
+        if (verbose) cat("No improvement, rolling back\n")
+        theta_current <- theta_prev
+        amplitudes <- amplitudes_prev
+        r_squared <- r_squared_prev
+        convergence_info[[paste0("global_iter_", iter)]] <- list(
+          max_param_change = max_change,
+          mean_r2 = mean(r_squared_prev),
+          r2_improvement = mean_r2_change,
+          rolled_back = TRUE
+        )
         break
+      } else {
+        amplitudes <- iter_result$beta0
+        r_squared <- r_squared_new
+
+        if (mean(r_squared) > best_r2) {
+          best_r2 <- mean(r_squared)
+          best_theta <- theta_current
+          best_amplitudes <- amplitudes
+        }
+
+        if (verbose) {
+          cat(sprintf("Max Δθ = %.4f, Mean R² = %.3f (Δ = %+.4f)\n",
+                      max_change, mean(r_squared), mean_r2_change))
+        }
+
+        convergence_info[[paste0("global_iter_", iter)]] <- list(
+          max_param_change = max_change,
+          mean_r2 = mean(r_squared),
+          r2_improvement = mean_r2_change,
+          rolled_back = FALSE
+        )
+
+        if (max_change < convergence_epsilon) {
+          if (verbose) cat("  ✓ Converged!\n")
+          break
+        }
       }
     }
+
+    theta_current <- best_theta
+    amplitudes <- best_amplitudes
   }
   
   # ========== STAGE 4: TIERED REFINEMENT ==========
