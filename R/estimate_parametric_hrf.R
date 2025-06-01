@@ -650,23 +650,24 @@ estimate_parametric_hrf <- function(
 # ========== HELPER FUNCTION IMPLEMENTATIONS ==========
 
 # MISSING FUNCTION 1: Parallel engine
-.parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times, 
-                                       hrf_interface, theta_seed, theta_bounds, 
+.parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times,
+                                       hrf_interface, theta_seed, theta_bounds,
                                        lambda_ridge = 0.01, n_cores = NULL) {
-  
+
   n_vox <- ncol(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
-  
-  # Split voxels across cores
-  if (is.null(n_cores)) n_cores <- parallel::detectCores() - 1
-  chunk_size <- ceiling(n_vox / n_cores)
-  voxel_chunks <- split(1:n_vox, ceiling(1:n_vox / chunk_size))
-  
-  # Parallel processing function
-  process_chunk <- function(voxel_idx) {
-    # Use regular engine for each chunk
-    result <- .parametric_engine(
-      Y_proj = Y_proj[, voxel_idx, drop = FALSE],
+
+  # Determine optimal parallel strategy
+  perf <- .master_performance_dispatcher(n_vox, nrow(Y_proj), verbose = FALSE)
+  if (is.null(n_cores)) {
+    n_cores <- perf$parallel$recommended_cores
+  }
+  par_cfg <- .setup_parallel_backend(if (perf$parallel$use_parallel) n_cores else 1,
+                                     verbose = FALSE)
+
+  process_voxel <- function(idx) {
+    res <- .parametric_engine(
+      Y_proj = Y_proj[, idx, drop = FALSE],
       S_target_proj = S_target_proj,
       scan_times = scan_times,
       hrf_eval_times = hrf_eval_times,
@@ -675,29 +676,23 @@ estimate_parametric_hrf <- function(
       theta_bounds = theta_bounds,
       lambda_ridge = lambda_ridge
     )
-    return(result)
+    list(theta_hat = res$theta_hat[1, ], beta0 = res$beta0[1])
   }
-  
-  # Run in parallel
-  if (.Platform$OS.type == "unix") {
-    chunk_results <- parallel::mclapply(voxel_chunks, process_chunk, mc.cores = n_cores)
-  } else {
-    cl <- parallel::makeCluster(n_cores)
-    chunk_results <- parallel::parLapply(cl, voxel_chunks, process_chunk)
-    parallel::stopCluster(cl)
-  }
-  
-  # Combine results
-  theta_hat <- matrix(NA_real_, n_vox, n_params)
-  beta0 <- numeric(n_vox)
-  
-  for (i in seq_along(chunk_results)) {
-    voxel_idx <- voxel_chunks[[i]]
-    theta_hat[voxel_idx, ] <- chunk_results[[i]]$theta_hat
-    beta0[voxel_idx] <- chunk_results[[i]]$beta0
-  }
-  
-  return(list(theta_hat = theta_hat, beta0 = beta0))
+
+  results <- .parallel_voxel_processing(
+    voxel_indices = seq_len(n_vox),
+    process_function = process_voxel,
+    parallel_config = par_cfg,
+    chunk_size = "auto",
+    progress = FALSE
+  )
+
+  par_cfg$cleanup()
+
+  theta_hat <- matrix(unlist(lapply(results, `[[`, "theta_hat")), n_vox, n_params, byrow = TRUE)
+  beta0 <- vapply(results, `[[`, numeric(1), "beta0")
+
+  list(theta_hat = theta_hat, beta0 = beta0)
 }
 
 # MISSING FUNCTION 2: Standard errors via Delta method
