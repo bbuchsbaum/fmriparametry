@@ -17,7 +17,7 @@
 #' - Parallel processing (Sprint 3)
 #' - Comprehensive diagnostics
 #'
-#' @export
+#' @keywords internal
 estimate_parametric_hrf_ultimate <- function(
   fmri_data,
   event_model,

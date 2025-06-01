@@ -49,9 +49,6 @@
   validate = TRUE
 ) {
   
-  # Load engineering standards
-  source(file.path(dirname(getwd()), "R", "engineering-standards.R"), local = TRUE)
-  
   # Start timing
   total_time <- system.time({
     
@@ -157,25 +154,9 @@
     solution_time <- system.time({
       if (algorithm_options$method == "qr") {
         # QR decomposition (numerically stable)
-        qr_decomp <- qr(design_matrix)
-        Q <- qr.Q(qr_decomp)
-        R <- qr.R(qr_decomp)
-        
-        # Check condition number
-        R_diag <- abs(diag(R))
-        condition <- max(R_diag) / min(R_diag[R_diag > .Machine$double.eps])
-        
-        if (condition > 1e8) {
-          warning(sprintf(
-            "Design matrix is ill-conditioned (kappa = %.2e), adding regularization",
-            condition
-          ))
-          R <- R + algorithm_options$ridge_lambda * diag(ncol(R))
-        }
-        
-        # Solve for all voxels at once
-        R_inv <- backsolve(R, diag(ncol(R)))
-        coefficients <- R_inv %*% crossprod(Q, fmri_data)
+        # Use optimized C++ ridge solver
+        coefficients <- .ridge_linear_solve(design_matrix, fmri_data,
+                                            algorithm_options$ridge_lambda)
         
       } else if (algorithm_options$method == "svd") {
         # SVD solution (most robust but slower)
@@ -285,43 +266,12 @@
 #' @return Convolved design matrix
 #' @keywords internal
 .optimized_convolution_engine <- function(signals, kernels, output_length) {
-  n_kernels <- ncol(kernels)
-  kernel_length <- nrow(kernels)
-  
-  # Pre-allocate output
-  design_matrix <- matrix(0, output_length, n_kernels)
-  
-  # Determine optimal method
-  if (output_length > 500 && kernel_length > 30) {
-    # FFT-based convolution for large problems
-    n_fft <- nextn(output_length + kernel_length - 1, factors = 2)
-    
-    # Pad signal
-    signal_padded <- c(signals[, 1], rep(0, n_fft - output_length))
-    signal_fft <- fft(signal_padded)
-    
-    # Convolve each kernel
-    for (j in seq_len(n_kernels)) {
-      kernel_padded <- c(kernels[, j], rep(0, n_fft - kernel_length))
-      kernel_fft <- fft(kernel_padded)
-      
-      # Multiply in frequency domain
-      conv_fft <- signal_fft * kernel_fft
-      
-      # Inverse FFT and extract valid portion
-      conv_full <- Re(fft(conv_fft, inverse = TRUE) / n_fft)
-      design_matrix[, j] <- conv_full[seq_len(output_length)]
-    }
-    
-  } else {
-    # Direct convolution for smaller problems
-    for (j in seq_len(n_kernels)) {
-      conv_full <- convolve(signals[, 1], rev(kernels[, j]), type = "open")
-      design_matrix[, j] <- conv_full[seq_len(output_length)]
-    }
+  if (NCOL(signals) != 1) {
+    stop("Only a single signal column is supported")
   }
-  
-  design_matrix
+
+  # Delegate to high performance helper which chooses the best method
+  .fast_batch_convolution(signals[, 1], kernels, output_length)
 }
 
 # Cache for basis functions

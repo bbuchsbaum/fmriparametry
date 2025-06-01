@@ -50,11 +50,7 @@
   X_design <- .batch_convolution(S_target_proj, X_basis, n_time)
 
   # 3. Linear solution with ridge regularisation
-  qr_decomp <- qr(X_design)
-  Q <- qr.Q(qr_decomp)
-  R <- qr.R(qr_decomp)
-  R_ridge <- R + lambda_ridge * diag(ncol(R))
-  coeffs <- solve(R_ridge, t(Q) %*% Y_proj)
+  coeffs <- .ridge_linear_solve(X_design, Y_proj, lambda_ridge)
 
   # 4. Extract amplitude and parameter updates
   beta0 <- coeffs[1, ]

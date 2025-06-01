@@ -84,30 +84,30 @@ test_that("Basic workflow with simulated data works", {
 
 test_that("Workflow with fmrireg objects works", {
   skip_if_not_installed("fmrireg")
-  
+
   set.seed(123)
-  
-  # Create fmrireg-compatible objects
+
+  # Create small fmrireg dataset and event model
   n_time <- 100
   n_vox <- 5
-  
-  # Simple synthetic data
-  fmri_data <- matrix(rnorm(n_time * n_vox), nrow = n_time, ncol = n_vox)
-  
-  # Event model with baseline
-  event_model <- cbind(
-    event = rbinom(n_time, 1, 0.1),  # Random events
-    baseline = 1                      # Constant baseline
+
+  bold_mat <- matrix(rnorm(n_time * n_vox), nrow = n_time, ncol = n_vox)
+  fmri_ds <- fmrireg::matrix_dataset(bold_mat, TR = 2, run_length = n_time)
+
+  ev <- fmrireg::event_model(
+    onset = c(20, 40, 60, 80),
+    blockids = rep(1, 4),
+    durations = rep(0, 4)
   )
-  
-  # Should work without errors
+
   fit <- estimate_parametric_hrf(
-    fmri_data = fmri_data,
-    event_model = event_model,
+    fmri_data = fmri_ds,
+    event_model = ev,
     parametric_hrf = "lwu",
-    verbose = FALSE
+    verbose = FALSE,
+    compute_se = FALSE
   )
-  
+
   expect_s3_class(fit, "parametric_hrf_fit")
   expect_equal(nrow(coef(fit)), n_vox)
 })

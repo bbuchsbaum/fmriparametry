@@ -386,21 +386,33 @@ test_that("Refinement handles edge cases safely", {
 test_that("Full Sprint 3 workflow completes successfully", {
   skip_if_not_installed("fmrireg")
   skip_on_cran()  # Too intensive for CRAN
-  
+
   # Create realistic test data
   test_data <- create_clustered_test_data(n_time = 100, n_vox = 50, n_clusters = 3)
-  
-  # Create mock fmri and event objects
-  fmri_data <- structure(
-    list(data = test_data$Y, dims = c(100, 50)),
-    class = "mock_fmri"
+
+  # Build real fmrireg objects
+  fmri_ds <- fmrireg::matrix_dataset(test_data$Y, TR = 2, run_length = 100)
+  ev <- fmrireg::event_model(
+    onset = which(test_data$S[, 1] == 1) * 2,
+    blockids = rep(1, sum(test_data$S[, 1] == 1)),
+    durations = rep(0, sum(test_data$S[, 1] == 1))
   )
-  
-  event_model <- structure(
-    list(design = test_data$S),
-    class = "mock_event"
+
+  fit <- estimate_parametric_hrf(
+    fmri_data = fmri_ds,
+    event_model = ev,
+    parametric_hrf = "lwu",
+    global_refinement = TRUE,
+    global_passes = 1,
+    kmeans_refinement = TRUE,
+    kmeans_k = 3,
+    kmeans_passes = 1,
+    compute_se = FALSE,
+    verbose = FALSE
   )
-  
+
+  expect_s3_class(fit, "parametric_hrf_fit")
+  expect_true(length(fit$r_squared) == 50)
 })
 
 # Test S3 methods with refinement info

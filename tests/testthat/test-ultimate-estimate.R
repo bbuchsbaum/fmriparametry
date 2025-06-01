@@ -12,7 +12,7 @@ test_that("ultimate estimator runs with basic numeric inputs", {
   event_model <- matrix(0, nrow = n_time, ncol = 1)
   event_model[c(8, 20, 32), 1] <- 1
 
-  fit <- estimate_parametric_hrf_ultimate(
+  fit <- fmriparametric:::estimate_parametric_hrf_ultimate(
     fmri_data = fmri_data,
     event_model = event_model,
     parametric_hrf = "lwu",
