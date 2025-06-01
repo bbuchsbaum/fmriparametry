@@ -84,7 +84,8 @@ if(getRversion() >= "2.15.1") {
 .onLoad <- function(libname, pkgname) {
   op <- options()
   op.fmrip <- list(
-    fmriparametric.refine_global = TRUE
+    fmriparametric.refine_global = TRUE,
+    fmriparametric.verbose = TRUE
   )
   toset <- !(names(op.fmrip) %in% names(op))
   if (any(toset)) options(op.fmrip[toset])
