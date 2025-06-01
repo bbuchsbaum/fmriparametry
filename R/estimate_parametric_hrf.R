@@ -598,16 +598,7 @@ estimate_parametric_hrf <- function(
 
 # Helper function to create HRF interface
 .create_hrf_interface <- function(model = "lwu") {
-  switch(model,
-    lwu = list(
-      hrf_function = .lwu_hrf_function,
-      taylor_basis = .lwu_hrf_taylor_basis_function,
-      parameter_names = .lwu_hrf_parameter_names(),
-      default_seed = .lwu_hrf_default_seed,
-      default_bounds = .lwu_hrf_default_bounds
-    ),
-    stop("Only 'lwu' model currently supported. More models coming soon!")
-  )
+  .get_hrf_interface(model)
 }
 
 
@@ -865,6 +856,51 @@ estimate_parametric_hrf <- function(
   return(classes)
 }
 
+##<<<<<<< codex/implement-missing-functions-in-r/consolidation_plan.r
+# Placeholder refinement functions
+.refine_moderate_voxels <- function(voxel_idx, Y_proj, S_target_proj,
+                                    theta_current, hrf_interface,
+                                    hrf_eval_times, local_radius = 26,
+                                    parallel = FALSE, n_cores = NULL) {
+  Y_sub <- Y_proj[, voxel_idx, drop = FALSE]
+  theta_sub <- theta_current[voxel_idx, , drop = FALSE]
+  n_vox <- length(voxel_idx)
+  n_params <- ncol(theta_sub)
+
+  theta_out <- matrix(NA_real_, n_vox, n_params)
+  amplitudes <- numeric(n_vox)
+
+  for (i in seq_len(n_vox)) {
+    res <- .parametric_engine(
+      Y_proj = Y_sub[, i, drop = FALSE],
+      S_target_proj = S_target_proj,
+      scan_times = seq_len(nrow(Y_proj)),
+      hrf_eval_times = hrf_eval_times,
+      hrf_interface = hrf_interface,
+      theta_seed = theta_sub[i, ],
+      theta_bounds = hrf_interface$default_bounds(),
+      lambda_ridge = 0.01
+    )
+    theta_out[i, ] <- res$theta_hat
+    amplitudes[i] <- res$beta0
+  }
+
+  list(theta_refined = theta_out, amplitudes = amplitudes)
+}
+
+.refine_hard_voxels <- function(voxel_idx, Y_proj, S_target_proj,
+                                theta_current, hrf_interface,
+                                hrf_eval_times, max_iter = 5,
+                                parallel = FALSE, n_cores = NULL) {
+  theta_sub <- theta_current[voxel_idx, , drop = FALSE]
+  r2_sub <- rep(0, length(voxel_idx))
+  queue_labels <- rep("hard_GN", length(voxel_idx))
+
+  gn_res <- .gauss_newton_refinement(
+    theta_hat_voxel = theta_sub,
+    r2_voxel = r2_sub,
+    Y_proj = Y_proj[, voxel_idx, drop = FALSE],
+##=======
 # Refinement functions
 .refine_moderate_voxels <- function(voxel_idx, Y_proj, S_target_proj,
                                     theta_current, r_squared,
@@ -951,16 +987,35 @@ estimate_parametric_hrf <- function(
     theta_hat_voxel = theta_current,
     r2_voxel = r_squared,
     Y_proj = Y_proj,
+##>>>>>>> main
     S_target_proj = S_target_proj,
     scan_times = seq_len(nrow(Y_proj)),
     hrf_eval_times = hrf_eval_times,
     hrf_interface = hrf_interface,
+##<<<<<<< codex/implement-missing-functions-in-r/consolidation_plan.r
+    theta_bounds = hrf_interface$default_bounds(),
+##=======
     theta_bounds = bounds,
+##>>>>>>> main
     queue_labels = queue_labels,
     max_iter_gn = max_iter,
     verbose = FALSE
   )
 
+##<<<<<<< codex/implement-missing-functions-in-r/consolidation_plan.r
+  # Compute amplitudes for refined voxels
+  amplitudes <- numeric(length(voxel_idx))
+  for (i in seq_along(voxel_idx)) {
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, gn_res$theta_hat[i, ])
+    conv_full <- stats::convolve(S_target_proj[, 1], rev(hrf_vals), type = "open")
+    x_pred <- conv_full[seq_len(nrow(Y_proj))]
+    y_v <- Y_proj[, voxel_idx[i]]
+    amplitudes[i] <- sum(x_pred * y_v) / sum(x_pred^2)
+  }
+
+  list(theta_refined = gn_res$theta_hat,
+       amplitudes = amplitudes)
+##=======
   theta_updated <- gn$theta_hat
 
   n_time <- nrow(Y_proj)
@@ -975,4 +1030,5 @@ estimate_parametric_hrf <- function(
 
   list(theta_refined = theta_updated[voxel_idx, , drop = FALSE],
        amplitudes = amps)
+##>>>>>>> main
 }
