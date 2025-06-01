@@ -47,17 +47,7 @@
   }
 
   # 2. Convolve stimulus with basis functions
-  X_design <- matrix(0, nrow = n_time, ncol = ncol(X_basis))
-  for (j in seq_len(ncol(X_basis))) {
-    basis_col <- X_basis[, j]
-    design_col <- numeric(n_time)
-    for (k in seq_len(ncol(S_target_proj))) {
-      s_col <- S_target_proj[, k]
-      conv_full <- stats::convolve(s_col, rev(basis_col), type = "open")
-      design_col <- design_col + conv_full[seq_len(n_time)]
-    }
-    X_design[, j] <- design_col
-  }
+  X_design <- .batch_convolution(S_target_proj, X_basis, n_time)
 
   # 3. Linear solution with ridge regularisation
   qr_decomp <- qr(X_design)

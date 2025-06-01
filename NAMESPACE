@@ -7,6 +7,7 @@ export(estimate_parametric_hrf_v2)
 export(estimate_parametric_hrf_v3)
 export(estimate_parametric_hrf_rock_solid)
 export(estimate_parametric_hrf_ultimate)
+export(register_hrf_model)
 
 S3method(print,parametric_hrf_fit)
 S3method(coef,parametric_hrf_fit)
