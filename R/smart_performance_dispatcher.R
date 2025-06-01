@@ -25,7 +25,6 @@
   
   if (use_fft) {
     # FFT method for large problems
-    source("R/performance_enhancements.R")
     return(.fast_batch_convolution(signal, kernels, output_length))
   } else {
     # Direct method for small problems
@@ -52,7 +51,6 @@
   
   if (iteration_context) {
     # Use caching for iterative algorithms
-    source("R/performance_enhancements.R")
     cache_key <- paste0("iter_", digest::digest(dim(X)))
     return(.cached_qr_solve(X, Y, cache_key, lambda_ridge))
   } else {

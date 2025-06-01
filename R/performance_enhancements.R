@@ -3,68 +3,6 @@
 #' Easy performance wins for 2-10x speedups without breaking existing code.
 #' These optimizations maintain 100% compatibility while being BLAZINGLY FAST.
 
-# OPTIMIZATION 1: Batch FFT Convolution (2-3x speedup)
-# ====================================================
-
-#' Fast batch convolution using FFT for multiple kernels
-#' 
-#' This replaces the sequential convolution loop with a single vectorized
-#' FFT operation, providing 2-3x speedup for design matrix construction.
-#' 
-#' @param signal Numeric vector - the stimulus signal
-#' @param kernels Numeric matrix - each column is a kernel to convolve
-#' @param output_length Integer - desired length of output
-#' @return Matrix with convolved signals (time x kernels)
-.fast_batch_convolution <- function(signal, kernels, output_length) {
-  n_kernels <- ncol(kernels)
-  kernel_length <- nrow(kernels)
-  
-  # Determine optimal method based on problem size
-  use_fft <- (output_length > 200 && kernel_length > 20)
-  
-  if (use_fft) {
-    # FFT METHOD: Optimal for large problems
-    
-    # Pad to efficient FFT size (power of 2)
-    n_fft <- 2^ceiling(log2(output_length + kernel_length - 1))
-    
-    # Pad signal once
-    signal_padded <- c(signal, rep(0, n_fft - length(signal)))
-    signal_fft <- fft(signal_padded)
-    
-    # Pre-allocate result
-    design_matrix <- matrix(0, output_length, n_kernels)
-    
-    # Vectorized kernel processing
-    for (j in seq_len(n_kernels)) {
-      # Pad kernel
-      kernel_padded <- c(kernels[, j], rep(0, n_fft - kernel_length))
-      kernel_fft <- fft(kernel_padded)
-      
-      # Convolution in frequency domain
-      conv_fft <- signal_fft * kernel_fft
-      
-      # Transform back and extract result
-      conv_result <- Re(fft(conv_fft, inverse = TRUE)) / n_fft
-      design_matrix[, j] <- conv_result[seq_len(output_length)]
-    }
-    
-    return(design_matrix)
-    
-  } else {
-    # DIRECT METHOD: Better for small problems
-    
-    design_matrix <- matrix(0, output_length, n_kernels)
-    
-    for (j in seq_len(n_kernels)) {
-      conv_full <- convolve(signal, rev(kernels[, j]), type = "open")
-      design_matrix[, j] <- conv_full[seq_len(output_length)]
-    }
-    
-    return(design_matrix)
-  }
-}
-
 # OPTIMIZATION 2: QR Decomposition Caching (5x speedup)
 # =====================================================
 
