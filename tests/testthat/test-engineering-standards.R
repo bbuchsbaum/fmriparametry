@@ -184,6 +184,23 @@ test_that("Memory checking works across platforms", {
   expect_false(result)
 })
 
+test_that("Repeated helper calls return consistent results", {
+  expect_identical(
+    .try_with_context({1 + 1}, context = "idempotent"),
+    .try_with_context({1 + 1}, context = "idempotent")
+  )
+
+  expect_identical(
+    .try_with_context(stop("boom"), context = "fallback", fallback = 42),
+    .try_with_context(stop("boom"), context = "fallback", fallback = 42)
+  )
+
+  expect_identical(
+    .check_memory_available(1e6, "repeat"),
+    .check_memory_available(1e6, "repeat")
+  )
+})
+
 context("Engineering Standards: Error Handling")
 
 test_that("Context-aware error handling provides useful diagnostics", {
