@@ -127,6 +127,22 @@ fit <- estimate_parametric_hrf(
 )
 ```
 
+### Using the Ultimate Wrapper
+
+For convenience, the package also provides
+`estimate_parametric_hrf_ultimate()`. This helper mirrors the main
+function but sets sensible defaults for iterative refinement and other
+advanced options.
+
+```r
+fit <- estimate_parametric_hrf_ultimate(
+  fmri_data = fmri_dataset,
+  event_model = event_model,
+  iterative_recentering = FALSE,
+  verbose = FALSE
+)
+```
+
 ## Performance
 
 The package is optimized for whole-brain analysis with:
@@ -149,6 +165,16 @@ h(t; θ) ≈ h(t; θ₀) + Σᵢ ∂h/∂θᵢ|θ₀ (θᵢ - θ₀ᵢ)
 ```
 
 This linearization allows efficient parameter estimation through standard linear regression with appropriate regularization.
+
+## Vignettes
+
+Detailed walk-throughs of package features are provided in the package vignettes:
+
+- `vignettes/introduction.Rmd` – getting started and basic concepts
+- `vignettes/advanced-features.Rmd` – advanced options and large-scale analyses
+- `vignettes/performance-guide.Rmd` – benchmarking and tuning tips
+
+Use `browseVignettes("fmriparametric")` within R to view them after installation.
 
 ## Contributing
 
