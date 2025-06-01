@@ -214,7 +214,7 @@ estimate_parametric_hrf <- function(
       theta_seed = theta_seed,
       theta_bounds = theta_bounds,
       lambda_ridge = lambda_ridge,
-      n_cores = n_cores
+      parallel_config = parallel_config
     )
   } else {
     core_result <- process_function(
@@ -289,7 +289,7 @@ estimate_parametric_hrf <- function(
           theta_seed = theta_center,
           theta_bounds = theta_bounds,
           lambda_ridge = lambda_ridge,
-          n_cores = n_cores
+          parallel_config = parallel_config
         )
       } else {
         iter_result <- process_function(
@@ -439,7 +439,7 @@ estimate_parametric_hrf <- function(
         hrf_eval_times = inputs$hrf_eval_times,
         local_radius = refinement_thresholds$local_radius,
         parallel = parallel,
-        n_cores = n_cores
+        parallel_config = parallel_config
       )
       
       # Update results
@@ -463,7 +463,7 @@ estimate_parametric_hrf <- function(
         hrf_eval_times = inputs$hrf_eval_times,
         max_iter = refinement_thresholds$gauss_newton_maxiter,
         parallel = parallel,
-        n_cores = n_cores
+        parallel_config = parallel_config
       )
       
       # Update results
@@ -616,11 +616,19 @@ estimate_parametric_hrf <- function(
 # MISSING FUNCTION 1: Parallel engine
 .parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times,
                                        hrf_interface, theta_seed, theta_bounds,
-                                       lambda_ridge = 0.01, n_cores = NULL) {
+                                       lambda_ridge = 0.01, parallel_config) {
+
+
 
   n_vox <- ncol(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
 
+## <<<<<<< codex/connect-unused-performance-features
+  # Processing function for a chunk of voxels
+  process_chunk <- function(voxel_idx) {
+    res <- .parametric_engine(
+      Y_proj = Y_proj[, voxel_idx, drop = FALSE],
+## =======
   # Determine optimal parallel strategy
   perf <- .master_performance_dispatcher(n_vox, nrow(Y_proj), verbose = FALSE)
   if (is.null(n_cores)) {
@@ -632,14 +640,39 @@ estimate_parametric_hrf <- function(
   process_voxel <- function(idx) {
     res <- .parametric_engine(
       Y_proj = Y_proj[, idx, drop = FALSE],
+## >>>>>>> main
       S_target_proj = S_target_proj,
       scan_times = scan_times,
       hrf_eval_times = hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = theta_seed,
       theta_bounds = theta_bounds,
-      lambda_ridge = lambda_ridge
+      lambda_ridge = lambda_ridge,
+      verbose = FALSE
     )
+## <<<<<<< codex/connect-unused-performance-features
+    list(list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0))
+  }
+
+  # Run using the generic parallel backend
+  chunk_results <- .parallel_voxel_processing(
+    voxel_indices = seq_len(n_vox),
+    process_function = process_chunk,
+    parallel_config = parallel_config,
+    chunk_size = "auto",
+    progress = FALSE
+  )
+
+  # Combine results
+  theta_hat <- matrix(NA_real_, n_vox, n_params)
+  beta0 <- numeric(n_vox)
+
+  for (res in chunk_results) {
+    theta_hat[res$indices, ] <- res$theta_hat
+    beta0[res$indices] <- res$beta0
+  }
+
+## =======
     list(theta_hat = res$theta_hat[1, ], beta0 = res$beta0[1])
   }
 
@@ -656,6 +689,7 @@ estimate_parametric_hrf <- function(
   theta_hat <- matrix(unlist(lapply(results, `[[`, "theta_hat")), n_vox, n_params, byrow = TRUE)
   beta0 <- vapply(results, `[[`, numeric(1), "beta0")
 
+## >>>>>>> main
   list(theta_hat = theta_hat, beta0 = beta0)
 }
 
