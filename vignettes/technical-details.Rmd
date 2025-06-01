@@ -1,0 +1,221 @@
+---
+title: "Technical Details: Mathematics of Taylor-Based HRF Estimation"
+author: "fmriparametric package authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Technical Details: Mathematics of Taylor-Based HRF Estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Mathematical Foundation
+
+This vignette provides the complete mathematical details of the Taylor approximation method for parametric HRF estimation.
+
+### The Parametric HRF Model
+
+We model the HRF as a function $h(t; \boldsymbol{\theta})$ where:
+- $t$ is time since stimulus onset
+- $\boldsymbol{\theta} = (\theta_1, \theta_2, ..., \theta_P)$ are the parameters
+
+For the Lag-Width-Undershoot (LWU) model:
+$$h(t; \tau, \sigma, \rho) = \exp\left(-\frac{(t-\tau)^2}{2\sigma^2}\right) - \rho \cdot \exp\left(-\frac{(t-\tau-2\sigma)^2}{2(1.6\sigma)^2}\right)$$
+
+### The Forward Model
+
+The observed BOLD signal $y(t)$ at a voxel is modeled as:
+$$y(t) = \beta_0 \cdot (s * h)(t) + \boldsymbol{z}^T(t)\boldsymbol{\gamma} + \epsilon(t)$$
+
+where:
+- $s(t)$ is the stimulus function
+- $*$ denotes convolution
+- $\beta_0$ is the response amplitude
+- $\boldsymbol{z}(t)$ are confound regressors
+- $\boldsymbol{\gamma}$ are confound coefficients
+- $\epsilon(t)$ is noise
+
+### Taylor Linearization
+
+The key insight is to linearize $h(t; \boldsymbol{\theta})$ around an expansion point $\boldsymbol{\theta}_0$:
+
+$$h(t; \boldsymbol{\theta}) \approx h(t; \boldsymbol{\theta}_0) + \sum_{j=1}^{P} \frac{\partial h}{\partial \theta_j}\bigg|_{\boldsymbol{\theta}_0} (\theta_j - \theta_{0j})$$
+
+Substituting into the forward model:
+
+$$y(t) \approx \beta_0 h_0(t) + \beta_0 \sum_{j=1}^{P} \frac{\partial h}{\partial \theta_j}\bigg|_{\boldsymbol{\theta}_0} (\theta_j - \theta_{0j}) + \boldsymbol{z}^T(t)\boldsymbol{\gamma} + \epsilon(t)$$
+
+Rearranging:
+
+$$y(t) = \beta_0 h_0(t) + \sum_{j=1}^{P} \delta_j \frac{\partial h}{\partial \theta_j}\bigg|_{\boldsymbol{\theta}_0} + \boldsymbol{z}^T(t)\boldsymbol{\gamma} + \epsilon(t)$$
+
+where $\delta_j = \beta_0(\theta_j - \theta_{0j})$.
+
+### Matrix Formulation
+
+Let:
+- $\boldsymbol{y} \in \mathbb{R}^T$ be the observed time series
+- $\boldsymbol{X}_0 = [h_0 \star s, \frac{\partial h}{\partial \theta_1}\bigg|_{\boldsymbol{\theta}_0} \star s, ..., \frac{\partial h}{\partial \theta_P}\bigg|_{\boldsymbol{\theta}_0} \star s] \in \mathbb{R}^{T \times (P+1)}$
+- $\boldsymbol{Z} \in \mathbb{R}^{T \times Q}$ be the confound matrix
+
+The linear system becomes:
+$$\boldsymbol{y} = [\boldsymbol{X}_0, \boldsymbol{Z}]\begin{bmatrix}\beta_0 \\ \delta_1 \\ \vdots \\ \delta_P \\ \gamma_1 \\ \vdots \\ \gamma_Q\end{bmatrix} + \boldsymbol{\epsilon}$$
+
+### Ridge Regularization
+
+To improve numerical stability, we add ridge regularization:
+$$\hat{\boldsymbol{\beta}} = \arg\min_{\boldsymbol{\beta}} ||\boldsymbol{y} - \boldsymbol{X}\boldsymbol{\beta}||^2_2 + \lambda||\boldsymbol{\beta}||^2_2$$
+
+The solution is:
+$$\hat{\boldsymbol{\beta}} = (\boldsymbol{X}^T\boldsymbol{X} + \lambda\boldsymbol{I})^{-1}\boldsymbol{X}^T\boldsymbol{y}$$
+
+### Parameter Recovery
+
+From the estimated coefficients:
+- $\hat{\beta}_0$ = amplitude estimate
+- $\hat{\delta}_j = \hat{\beta}_0(\hat{\theta}_j - \theta_{0j})$
+
+Therefore:
+$$\hat{\theta}_j = \theta_{0j} + \frac{\hat{\delta}_j}{\hat{\beta}_0}$$
+
+## Derivatives for the LWU Model
+
+For implementation, we need the partial derivatives:
+
+### Main Gaussian Component
+
+Let $g_1(t) = \exp\left(-\frac{(t-\tau)^2}{2\sigma^2}\right)$
+
+$$\frac{\partial g_1}{\partial \tau} = \frac{t-\tau}{\sigma^2} g_1(t)$$
+
+$$\frac{\partial g_1}{\partial \sigma} = \frac{(t-\tau)^2}{\sigma^3} g_1(t)$$
+
+### Undershoot Component
+
+Let $g_2(t) = \exp\left(-\frac{(t-\tau-2\sigma)^2}{2(1.6\sigma)^2}\right)$
+
+$$\frac{\partial g_2}{\partial \tau} = \frac{t-\tau-2\sigma}{(1.6\sigma)^2} g_2(t)$$
+
+$$\frac{\partial g_2}{\partial \sigma} = \left[\frac{(t-\tau-2\sigma)^2}{(1.6)^2\sigma^3} - \frac{2(t-\tau-2\sigma)}{(1.6\sigma)^2}\right] g_2(t)$$
+
+### Complete Derivatives
+
+$$\frac{\partial h}{\partial \tau} = \frac{\partial g_1}{\partial \tau} - \rho \frac{\partial g_2}{\partial \tau}$$
+
+$$\frac{\partial h}{\partial \sigma} = \frac{\partial g_1}{\partial \sigma} - \rho \frac{\partial g_2}{\partial \sigma}$$
+
+$$\frac{\partial h}{\partial \rho} = -g_2(t)$$
+
+## Implementation Details
+
+### Numerical Considerations
+
+1. **Near-zero amplitudes**: When $|\hat{\beta}_0| < \epsilon$, we use:
+   $$\hat{\theta}_j = \theta_{0j} + \frac{\hat{\delta}_j}{\max(|\hat{\beta}_0|, \epsilon) \cdot \text{sign}(\hat{\beta}_0)}$$
+
+2. **Parameter bounds**: After each update:
+   $$\hat{\theta}_j = \max(\theta_j^{\text{lower}}, \min(\hat{\theta}_j, \theta_j^{\text{upper}}))$$
+
+3. **QR decomposition**: We use QR factorization for numerical stability:
+   $$\boldsymbol{X} = \boldsymbol{Q}\boldsymbol{R}$$
+   $$\hat{\boldsymbol{\beta}} = \boldsymbol{R}^{-1}\boldsymbol{Q}^T\boldsymbol{y}$$
+
+### Iterative Refinement
+
+The global refinement procedure:
+
+1. Initialize $\boldsymbol{\theta}^{(0)}$
+2. For $k = 1, ..., K$:
+   - Compute Taylor basis at $\boldsymbol{\theta}^{(k-1)}$
+   - Estimate all voxel parameters
+   - Update global center: $\boldsymbol{\theta}^{(k)} = \text{median}(\{\hat{\boldsymbol{\theta}}_v : R^2_v > \tau_{R^2}\})$
+   - Check convergence: $||\boldsymbol{\theta}^{(k)} - \boldsymbol{\theta}^{(k-1)}|| < \epsilon$
+
+## Standard Error Estimation
+
+Using the Delta method, the covariance of $\hat{\boldsymbol{\theta}}$ is:
+
+$$\text{Cov}(\hat{\boldsymbol{\theta}}) = \boldsymbol{J} \text{Cov}(\hat{\boldsymbol{\beta}}) \boldsymbol{J}^T$$
+
+where the Jacobian $\boldsymbol{J}$ has elements:
+
+$$J_{ij} = \frac{\partial \theta_i}{\partial \beta_j} = \begin{cases}
+-\frac{\delta_i}{\beta_0^2} & \text{if } j = 0 \\
+\frac{1}{\beta_0} & \text{if } j = i \\
+0 & \text{otherwise}
+\end{cases}$$
+
+The coefficient covariance is:
+$$\text{Cov}(\hat{\boldsymbol{\beta}}) = \hat{\sigma}^2 (\boldsymbol{X}^T\boldsymbol{X} + \lambda\boldsymbol{I})^{-1}$$
+
+where $\hat{\sigma}^2 = \frac{||\boldsymbol{y} - \boldsymbol{X}\hat{\boldsymbol{\beta}}||^2}{T - P - 1}$.
+
+## Performance Optimizations
+
+### Convolution Strategy
+
+For efficiency, we convolve the basis functions once:
+
+```{r convolution-strategy, eval=FALSE}
+# Inefficient: convolve for each voxel
+for (v in 1:n_voxels) {
+  X_v <- convolve_basis_with_stimulus(basis, stimulus)
+  beta_v <- solve(X_v, y[,v])
+}
+
+# Efficient: convolve once, solve for all voxels
+X <- convolve_basis_with_stimulus(basis, stimulus)
+beta <- solve(X, Y)  # All voxels at once
+```
+
+### Parallel Processing
+
+The voxel-wise operations are embarrassingly parallel:
+
+```{r parallel-strategy, eval=FALSE}
+# Split voxels across cores
+voxel_chunks <- split(1:n_voxels, 
+                      cut(1:n_voxels, n_cores))
+
+# Process chunks in parallel
+results <- mclapply(voxel_chunks, function(chunk) {
+  process_voxel_chunk(Y[, chunk], X, theta_0)
+}, mc.cores = n_cores)
+```
+
+## Algorithm Complexity
+
+- **Time complexity**: $O(T \cdot P^2 + P^3 + V)$ per iteration
+  - $T \cdot P^2$: Convolution of $P$ basis functions
+  - $P^3$: Matrix inversion
+  - $V$: Voxel-wise operations
+
+- **Space complexity**: $O(T \cdot V + T \cdot P)$
+  - $T \cdot V$: Data matrix
+  - $T \cdot P$: Design matrix
+
+## Convergence Properties
+
+The Taylor approximation converges when:
+
+1. **Local convexity**: The HRF function is locally convex near the solution
+2. **Good initialization**: $||\boldsymbol{\theta}_0 - \boldsymbol{\theta}^*|| < r$ where $r$ is the radius of convergence
+3. **Sufficient SNR**: The signal-to-noise ratio exceeds a threshold
+
+Convergence rate is quadratic near the solution:
+$$||\boldsymbol{\theta}^{(k+1)} - \boldsymbol{\theta}^*|| \leq c ||\boldsymbol{\theta}^{(k)} - \boldsymbol{\theta}^*||^2$$
+
+## References
+
+1. Nocedal, J., & Wright, S. (2006). Numerical optimization. Springer Science & Business Media.
+
+2. Casella, G., & Berger, R. L. (2002). Statistical inference (Vol. 2). Pacific Grove, CA: Duxbury.
+
+3. Golub, G. H., & Van Loan, C. F. (2013). Matrix computations. JHU press.

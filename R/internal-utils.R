@@ -37,17 +37,39 @@
 .fmriparametric_internal$get_available_memory <- function() {
   if (.Platform$OS.type == "windows") {
     memory.limit() * 1024^2
+  } else if (Sys.info()["sysname"] == "Darwin") {
+    # macOS
+    tryCatch({
+      vm_stat <- system("vm_stat", intern = TRUE)
+      free_line <- grep("Pages free:", vm_stat, value = TRUE)
+      inactive_line <- grep("Pages inactive:", vm_stat, value = TRUE)
+      
+      free_pages <- as.numeric(gsub(".*:\\s*(\\d+).*", "\\1", free_line))
+      inactive_pages <- as.numeric(gsub(".*:\\s*(\\d+).*", "\\1", inactive_line))
+      
+      # Page size is typically 4096 bytes on macOS
+      (free_pages + inactive_pages) * 4096
+    }, error = function(e) {
+      4e9  # Default 4GB
+    })
   } else {
+    # Linux
     tryCatch({
       as.numeric(system("awk '/MemAvailable/ {print $2}' /proc/meminfo", intern = TRUE)) * 1024
     }, error = function(e) {
-      4e9
+      4e9  # Default 4GB
     })
   }
 }
 
 .fmriparametric_internal$check_memory_available <- function(required_bytes, operation = "") {
   available <- .fmriparametric_internal$get_available_memory()
+  
+  # Handle case where available memory cannot be determined
+  if (is.na(available) || is.null(available) || !is.numeric(available)) {
+    # Can't determine memory, assume it's OK
+    return(TRUE)
+  }
 
   if (required_bytes > available * 0.8) {
     warning(sprintf(

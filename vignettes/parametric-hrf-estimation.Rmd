@@ -1,0 +1,513 @@
+---
+title: "Understanding Parametric HRF Estimation with Taylor Approximation"
+author: "fmriparametric package authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Understanding Parametric HRF Estimation with Taylor Approximation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r packages, message=FALSE}
+library(fmriparametric)
+library(fmrireg)
+library(ggplot2)
+library(gridExtra)
+```
+
+## Introduction: Why Parametric HRF Models?
+
+When we analyze fMRI data, we're trying to understand how the brain responds to stimuli. The blood oxygen level dependent (BOLD) signal we measure is a delayed and dispersed version of the underlying neural activity. This delay and dispersion is characterized by the Hemodynamic Response Function (HRF).
+
+### The Challenge
+
+Traditional fMRI analysis assumes the HRF has a fixed shape across all brain regions. But in reality:
+
+- **Different brain regions** have different vascular properties
+- **Different individuals** have different hemodynamic characteristics  
+- **Different conditions** may evoke different response dynamics
+
+### The Solution: Parametric HRF Models
+
+Instead of assuming a fixed HRF shape, we can model the HRF using a few interpretable parameters. The `fmriparametric` package focuses on the **Lag-Width-Undershoot (LWU)** model, which captures three key aspects of the HRF:
+
+1. **Lag (τ)**: When does the response peak? (timing)
+2. **Width (σ)**: How spread out is the response? (duration)
+3. **Undershoot (ρ)**: How strong is the post-stimulus undershoot? (recovery)
+
+## Understanding the LWU Model
+
+The LWU model represents the HRF as:
+
+$$h(t; \tau, \sigma, \rho) = e^{-\frac{(t-\tau)^2}{2\sigma^2}} - \rho \cdot e^{-\frac{(t-\tau-2\sigma)^2}{2(1.6\sigma)^2}}$$
+
+Let's visualize how each parameter affects the HRF shape:
+
+```{r lwu-parameters, fig.height=8}
+# Function to plot HRF with different parameters
+plot_hrf_variations <- function() {
+  t <- seq(0, 20, by = 0.1)
+  
+  # Varying tau (lag)
+  p1 <- ggplot() + theme_minimal() + 
+    labs(title = "Effect of Lag (τ)", x = "Time (s)", y = "HRF") +
+    xlim(0, 20) + ylim(-0.2, 1.2)
+  
+  for (tau in c(4, 6, 8)) {
+    hrf <- fmrireg::hrf_lwu(t, tau = tau, sigma = 2.5, rho = 0.35)
+    p1 <- p1 + geom_line(aes(x = t, y = hrf, color = factor(tau)), 
+                         data = data.frame(t = t, hrf = hrf), size = 1.2)
+  }
+  p1 <- p1 + scale_color_manual(name = "τ", values = c("red", "black", "blue"))
+  
+  # Varying sigma (width)
+  p2 <- ggplot() + theme_minimal() + 
+    labs(title = "Effect of Width (σ)", x = "Time (s)", y = "HRF") +
+    xlim(0, 20) + ylim(-0.2, 1.2)
+  
+  for (sigma in c(1.5, 2.5, 3.5)) {
+    hrf <- fmrireg::hrf_lwu(t, tau = 6, sigma = sigma, rho = 0.35)
+    p2 <- p2 + geom_line(aes(x = t, y = hrf, color = factor(sigma)), 
+                         data = data.frame(t = t, hrf = hrf), size = 1.2)
+  }
+  p2 <- p2 + scale_color_manual(name = "σ", values = c("red", "black", "blue"))
+  
+  # Varying rho (undershoot)
+  p3 <- ggplot() + theme_minimal() + 
+    labs(title = "Effect of Undershoot (ρ)", x = "Time (s)", y = "HRF") +
+    xlim(0, 20) + ylim(-0.2, 1.2)
+  
+  for (rho in c(0, 0.35, 0.7)) {
+    hrf <- fmrireg::hrf_lwu(t, tau = 6, sigma = 2.5, rho = rho)
+    p3 <- p3 + geom_line(aes(x = t, y = hrf, color = factor(rho)), 
+                         data = data.frame(t = t, hrf = hrf), size = 1.2)
+  }
+  p3 <- p3 + scale_color_manual(name = "ρ", values = c("red", "black", "blue"))
+  
+  grid.arrange(p1, p2, p3, ncol = 1)
+}
+
+plot_hrf_variations()
+```
+
+## How Does Taylor Approximation Work?
+
+The key insight is that we can **linearize** the nonlinear HRF function around a starting point. This transforms a difficult nonlinear optimization problem into a simple linear regression!
+
+### The Mathematical Intuition
+
+Given an HRF function $h(t; \theta)$ where $\theta = (\tau, \sigma, \rho)$, we can approximate it near a point $\theta_0$ using a first-order Taylor expansion:
+
+$$h(t; \theta) \approx h(t; \theta_0) + \sum_{i} \frac{\partial h}{\partial \theta_i}\bigg|_{\theta_0} \cdot (\theta_i - \theta_{0i})$$
+
+### Why This Works: A Visual Explanation
+
+```{r taylor-intuition, fig.height=6}
+# Demonstrate Taylor approximation visually
+demonstrate_taylor <- function() {
+  # True parameters and starting point
+  theta_true <- c(tau = 5, sigma = 2, rho = 0.4)
+  theta_0 <- c(tau = 6, sigma = 2.5, rho = 0.35)
+  
+  t <- seq(0, 15, by = 0.1)
+  
+  # True HRF
+  hrf_true <- fmrireg::hrf_lwu(t, tau = theta_true[1], 
+                               sigma = theta_true[2], 
+                               rho = theta_true[3])
+  
+  # HRF at expansion point
+  hrf_0 <- fmrireg::hrf_lwu(t, tau = theta_0[1], 
+                            sigma = theta_0[2], 
+                            rho = theta_0[3])
+  
+  # Get Taylor basis (HRF and derivatives)
+  basis <- fmrireg::hrf_basis_lwu(theta0 = theta_0, t = t)
+  
+  # True parameter differences
+  delta_theta <- theta_true - theta_0
+  
+  # Taylor approximation
+  hrf_taylor <- basis[,1] + basis[,2] * delta_theta[1] + 
+                basis[,3] * delta_theta[2] + basis[,4] * delta_theta[3]
+  
+  # Plot
+  df <- data.frame(
+    t = rep(t, 3),
+    hrf = c(hrf_true, hrf_0, hrf_taylor),
+    type = rep(c("True HRF", "Expansion Point", "Taylor Approximation"), 
+               each = length(t))
+  )
+  
+  ggplot(df, aes(x = t, y = hrf, color = type, linetype = type)) +
+    geom_line(size = 1.2) +
+    scale_color_manual(values = c("True HRF" = "black", 
+                                  "Expansion Point" = "blue", 
+                                  "Taylor Approximation" = "red")) +
+    scale_linetype_manual(values = c("True HRF" = "solid", 
+                                     "Expansion Point" = "dashed", 
+                                     "Taylor Approximation" = "dotted")) +
+    labs(title = "Taylor Approximation of the HRF",
+         subtitle = "The linearized approximation (red) closely matches the true HRF (black)",
+         x = "Time (s)", y = "HRF", color = "", linetype = "") +
+    theme_minimal() +
+    theme(legend.position = "bottom")
+}
+
+demonstrate_taylor()
+```
+
+The Taylor approximation (red dotted line) provides a good local approximation to the true HRF. By iteratively updating our expansion point, we can converge to the true parameters!
+
+## The Algorithm Step by Step
+
+### Step 1: Initialize Parameters
+
+We start with a reasonable guess for the HRF parameters:
+- τ = 6 seconds (typical peak time)
+- σ = 2.5 seconds (typical width)
+- ρ = 0.35 (moderate undershoot)
+
+### Step 2: Construct the Design Matrix
+
+At our current parameter estimate $\theta_0$, we:
+
+1. Evaluate the HRF and its derivatives
+2. Convolve each with the stimulus timing
+3. Create a design matrix with columns: [HRF, ∂HRF/∂τ, ∂HRF/∂σ, ∂HRF/∂ρ]
+
+### Step 3: Solve the Linear System
+
+We fit the model:
+$$Y = \beta_0 \cdot h(t;\theta_0) + \beta_1 \cdot \frac{\partial h}{\partial \tau} + \beta_2 \cdot \frac{\partial h}{\partial \sigma} + \beta_3 \cdot \frac{\partial h}{\partial \rho} + \epsilon$$
+
+### Step 4: Update Parameters
+
+The new parameters are:
+- $\tau_{new} = \tau_0 + \beta_1 / \beta_0$
+- $\sigma_{new} = \sigma_0 + \beta_2 / \beta_0$  
+- $\rho_{new} = \rho_0 + \beta_3 / \beta_0$
+
+### Step 5: Iterate (if using global refinement)
+
+Repeat steps 2-4 with the updated parameters until convergence.
+
+## A Complete Example: Simulated Data
+
+Let's walk through a complete analysis with simulated data:
+
+```{r simulation-example}
+# Set random seed for reproducibility
+set.seed(42)
+
+# Simulation parameters
+n_time <- 200
+TR <- 2
+times <- (0:(n_time-1)) * TR
+
+# Create event timing (10 events)
+event_times <- seq(20, 380, by = 40)
+events <- rep(0, n_time)
+events[round(event_times/TR)] <- 1
+
+# True HRF parameters (varying across 3 regions)
+true_params <- matrix(
+  c(5.5, 2.0, 0.3,   # Region 1: early, narrow peak
+    6.5, 3.0, 0.4,   # Region 2: typical response  
+    7.5, 3.5, 0.2),  # Region 3: late, wide peak
+  nrow = 3, byrow = TRUE
+)
+
+# Generate BOLD signals
+generate_bold <- function(events, params, noise_sd = 0.5) {
+  t_hrf <- seq(0, 30, by = 0.1)
+  hrf <- fmrireg::hrf_lwu(t_hrf, tau = params[1], 
+                          sigma = params[2], rho = params[3])
+  
+  # Convolve events with HRF
+  bold <- stats::filter(events, hrf[seq(1, length(t_hrf), by = 20)], 
+                       method = "conv", sides = 1)
+  bold[is.na(bold)] <- 0
+  
+  # Add noise
+  bold + rnorm(length(bold), sd = noise_sd)
+}
+
+# Generate data for 3 voxels
+Y <- matrix(NA, nrow = n_time, ncol = 3)
+for (v in 1:3) {
+  Y[,v] <- generate_bold(events, true_params[v,])
+}
+
+# Prepare data
+fmri_data <- Y
+event_model <- matrix(events, ncol = 1)
+
+# Run parametric HRF estimation
+cat("Estimating HRF parameters...\n")
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  global_refinement = TRUE,
+  global_passes = 3,
+  verbose = TRUE
+)
+
+# Compare true vs estimated parameters
+estimated <- coef(fit)
+comparison <- data.frame(
+  Voxel = rep(1:3, each = 3),
+  Parameter = rep(c("tau", "sigma", "rho"), 3),
+  True = c(t(true_params)),
+  Estimated = c(t(estimated)),
+  Error = c(t(estimated)) - c(t(true_params))
+)
+
+print(comparison)
+```
+
+### Visualizing the Fits
+
+```{r visualize-fits, fig.height=8}
+# Plot true vs estimated HRFs
+plot_fitted_hrfs <- function(true_params, estimated_params) {
+  t <- seq(0, 20, by = 0.1)
+  plots <- list()
+  
+  for (v in 1:3) {
+    # True HRF
+    hrf_true <- fmrireg::hrf_lwu(t, tau = true_params[v,1], 
+                                 sigma = true_params[v,2], 
+                                 rho = true_params[v,3])
+    
+    # Estimated HRF
+    hrf_est <- fmrireg::hrf_lwu(t, tau = estimated_params[v,1], 
+                                sigma = estimated_params[v,2], 
+                                rho = estimated_params[v,3])
+    
+    df <- data.frame(
+      t = rep(t, 2),
+      hrf = c(hrf_true, hrf_est),
+      type = rep(c("True", "Estimated"), each = length(t))
+    )
+    
+    plots[[v]] <- ggplot(df, aes(x = t, y = hrf, color = type)) +
+      geom_line(size = 1.2) +
+      scale_color_manual(values = c("True" = "black", "Estimated" = "red")) +
+      labs(title = paste("Voxel", v),
+           subtitle = sprintf("τ: %.2f→%.2f, σ: %.2f→%.2f, ρ: %.2f→%.2f",
+                             true_params[v,1], estimated_params[v,1],
+                             true_params[v,2], estimated_params[v,2],
+                             true_params[v,3], estimated_params[v,3]),
+           x = "Time (s)", y = "HRF") +
+      theme_minimal() +
+      theme(legend.position = "bottom")
+  }
+  
+  grid.arrange(grobs = plots, ncol = 1)
+}
+
+plot_fitted_hrfs(true_params, coef(fit))
+```
+
+## Working with Real fMRI Data
+
+Here's how to use the package with real fMRI data using the `fmrireg` ecosystem:
+
+```{r real-data-example, eval=FALSE}
+# Load fMRI data
+fmri_data <- fmrireg::fmri_dataset(
+  scans = "path/to/functional.nii.gz",
+  mask = "path/to/brain_mask.nii.gz",
+  TR = 2,
+  run_length = 300
+)
+
+# Define events
+events_df <- data.frame(
+  onset = c(10, 30, 50, 70, 90, 110, 130, 150),
+  duration = rep(2, 8),
+  condition = rep(c("A", "B"), 4)
+)
+
+# Create event model
+event_model <- fmrireg::event_model(
+  onset ~ condition,
+  data = events_df,
+  sampling_frame = fmri_data
+)
+
+# Estimate parametric HRFs
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  mask = mask,
+  global_refinement = TRUE,
+  compute_se = TRUE,
+  verbose = TRUE
+)
+
+# Examine results
+summary(fit)
+
+# Extract parameters for further analysis
+params <- coef(fit)
+tau_map <- params[, "tau"]
+sigma_map <- params[, "sigma"] 
+rho_map <- params[, "rho"]
+
+# Get standard errors
+se_params <- coef(fit, type = "se")
+```
+
+## Understanding Your Results
+
+### Parameter Interpretation
+
+1. **Lag (τ)**: 
+   - Normal range: 4-8 seconds
+   - Earlier peaks (τ < 5) may indicate:
+     - Regions with rich vascular supply
+     - Strong, direct neural response
+   - Later peaks (τ > 7) may indicate:
+     - Regions with slower vascular response
+     - Indirect or feedback processing
+
+2. **Width (σ)**:
+   - Normal range: 1.5-4 seconds
+   - Narrow responses (σ < 2) suggest:
+     - Precise temporal processing
+     - Good neurovascular coupling
+   - Wide responses (σ > 3.5) suggest:
+     - Sustained neural activity
+     - Sluggish vascular response
+
+3. **Undershoot (ρ)**:
+   - Normal range: 0.2-0.6
+   - Low undershoot (ρ < 0.3):
+     - Quick return to baseline
+     - Efficient oxygen metabolism
+   - High undershoot (ρ > 0.5):
+     - Prolonged recovery
+     - May indicate metabolic debt
+
+### Quality Control
+
+Check the fit quality using R-squared values:
+
+```{r qc-example, eval=FALSE}
+# Get R-squared values
+r2 <- fit$fit_quality$r_squared
+
+# Identify well-fit voxels
+good_voxels <- which(r2 > 0.5)
+poor_voxels <- which(r2 < 0.2)
+
+cat("Fit quality summary:\n")
+cat("  Excellent fits (R² > 0.7):", sum(r2 > 0.7), "\n")
+cat("  Good fits (R² > 0.5):", sum(r2 > 0.5), "\n")
+cat("  Poor fits (R² < 0.2):", sum(r2 < 0.2), "\n")
+```
+
+## Advanced Features
+
+### 1. Data-Driven Initialization
+
+Instead of using default starting values, let the data guide initialization:
+
+```{r data-driven, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  theta_seed = "data_driven",  # Automatic initialization
+  verbose = TRUE
+)
+```
+
+### 2. Tiered Refinement
+
+For challenging voxels, use advanced refinement strategies:
+
+```{r refinement, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  tiered_refinement = "moderate",  # or "aggressive"
+  refinement_thresholds = list(
+    r2_easy = 0.7,      # Good fits need no refinement
+    r2_hard = 0.3,      # Poor fits get intensive refinement
+    gauss_newton_maxiter = 10
+  )
+)
+```
+
+### 3. Parallel Processing
+
+For large datasets, use parallel processing:
+
+```{r parallel, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parallel = TRUE,
+  n_cores = 4
+)
+```
+
+## Common Issues and Solutions
+
+### Issue 1: Poor Fits in Some Regions
+
+**Symptoms**: Low R² values, unrealistic parameter estimates
+
+**Solutions**:
+- Check if events coincide with motion or other artifacts
+- Consider using robust estimation (when implemented)
+- Examine whether the HRF model is appropriate for the region
+
+### Issue 2: Parameters at Bounds
+
+**Symptoms**: Many voxels with τ=0 or σ=0.05
+
+**Solutions**:
+- The signal may be too noisy
+- Try different initialization strategies
+- Consider masking out low-SNR voxels
+
+### Issue 3: Slow Computation
+
+**Solutions**:
+- Use parallel processing
+- Reduce the number of global refinement passes
+- Apply a more restrictive mask
+
+## Conclusion
+
+The parametric HRF approach offers several advantages:
+
+1. **Interpretability**: Parameters have clear physiological meaning
+2. **Sensitivity**: Can detect subtle differences in hemodynamic response
+3. **Efficiency**: Taylor approximation makes estimation fast
+4. **Flexibility**: Can adapt to different brain regions and individuals
+
+By understanding how your brain's hemodynamic response varies across regions and conditions, you can gain deeper insights into neural processing and its vascular correlates.
+
+## References
+
+1. Glover, G. H. (1999). Deconvolution of impulse response in event-related BOLD fMRI. NeuroImage, 9(4), 416-429.
+
+2. Lindquist, M. A., & Wager, T. D. (2007). Validity and power in hemodynamic response modeling: A comparison study and a new approach. Human Brain Mapping, 28(8), 764-784.
+
+3. Woolrich, M. W., Behrens, T. E., & Smith, S. M. (2004). Constrained linear basis sets for HRF modelling using Variational Bayes. NeuroImage, 21(4), 1748-1761.

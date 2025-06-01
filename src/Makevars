@@ -1,4 +1,19 @@
 CXX_STD = CXX11
-PKG_CXXFLAGS += -fopenmp
-PKG_LIBS += -fopenmp
+
+# RcppParallel support
+PKG_CXXFLAGS += $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::CxxFlags()")
+PKG_LIBS += $(shell "${R_HOME}/bin/Rscript" -e "RcppParallel::LdFlags()")
+
+# macOS specific rpath setting for RcppParallel
+ifeq ($(shell uname),Darwin)
+  PKG_LIBS += -Wl,-rpath,$(shell "${R_HOME}/bin/Rscript" -e "cat(system.file('lib', package = 'RcppParallel'))")
+endif
+
+# OpenMP support is conditional on platform
+ifeq ($(shell uname),Darwin)
+  # macOS: OpenMP not supported by default clang
+else
+  PKG_CXXFLAGS += -fopenmp
+  PKG_LIBS += -fopenmp
+endif
 

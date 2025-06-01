@@ -177,9 +177,9 @@ get_timing_report <- function() {
   
   result <- numerator / denominator
   
-  # Check for non-finite results
-  if (any(!is.finite(result))) {
-    n_invalid <- sum(!is.finite(result))
+  # Check for non-finite results (including NaN from Inf/Inf)
+  if (any(!is.finite(result), na.rm = TRUE)) {
+    n_invalid <- sum(!is.finite(result), na.rm = TRUE)
     warning(sprintf(
       "Division produced %d non-finite values, setting to zero",
       n_invalid

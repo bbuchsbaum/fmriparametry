@@ -1,0 +1,117 @@
+/* Custom CSS for fmriparametric vignettes */
+
+/* Improve readability */
+body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+  line-height: 1.6;
+}
+
+/* Better code blocks */
+pre {
+  background-color: #f4f4f4;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  overflow-x: auto;
+}
+
+pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+/* Inline code */
+code {
+  background-color: #f4f4f4;
+  padding: 2px 4px;
+  border-radius: 2px;
+  font-size: 90%;
+}
+
+/* Headers */
+h1, h2, h3 {
+  color: #333;
+  margin-top: 30px;
+}
+
+h1 {
+  border-bottom: 2px solid #ddd;
+  padding-bottom: 10px;
+}
+
+h2 {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+/* Mathematical formulas */
+.math {
+  font-size: 110%;
+  margin: 10px 0;
+}
+
+/* Highlight important notes */
+.note {
+  background-color: #e7f3ff;
+  border-left: 4px solid #2196F3;
+  padding: 10px 15px;
+  margin: 20px 0;
+}
+
+.warning {
+  background-color: #fff3cd;
+  border-left: 4px solid #ffc107;
+  padding: 10px 15px;
+  margin: 20px 0;
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 20px 0;
+}
+
+table th, table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+table th {
+  background-color: #f4f4f4;
+  font-weight: bold;
+}
+
+/* Figure captions */
+.figure {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.caption {
+  font-style: italic;
+  color: #666;
+  margin-top: 10px;
+}
+
+/* Improve list spacing */
+ul, ol {
+  margin: 15px 0;
+  padding-left: 30px;
+}
+
+li {
+  margin: 5px 0;
+}
+
+/* Blockquotes for emphasis */
+blockquote {
+  border-left: 4px solid #ddd;
+  padding-left: 15px;
+  margin: 20px 0;
+  color: #666;
+  font-style: italic;
+}

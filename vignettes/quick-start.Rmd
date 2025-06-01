@@ -1,0 +1,222 @@
+---
+title: "Quick Start Guide: Parametric HRF Estimation"
+author: "fmriparametric package authors"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Quick Start Guide: Parametric HRF Estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Installation
+
+```{r install, eval=FALSE}
+# Install from GitHub (requires devtools)
+devtools::install_github("bbuchsbaum/fmriparametric")
+```
+
+## Basic Usage
+
+The `fmriparametric` package estimates voxel-specific HRF parameters using the Lag-Width-Undershoot (LWU) model.
+
+### Minimal Example
+
+```{r minimal}
+library(fmriparametric)
+
+# Simulate simple data
+set.seed(123)
+n_time <- 100
+n_voxels <- 10
+
+# Create BOLD signal matrix (time x voxels)
+bold_data <- matrix(rnorm(n_time * n_voxels, mean = 100, sd = 10), 
+                    nrow = n_time, ncol = n_voxels)
+
+# Create event timing (1 = event, 0 = no event)
+events <- rep(0, n_time)
+events[c(10, 30, 50, 70, 90)] <- 1
+event_matrix <- matrix(events, ncol = 1)
+
+# Estimate HRF parameters
+fit <- estimate_parametric_hrf(
+  fmri_data = bold_data,
+  event_model = event_matrix,
+  parametric_hrf = "lwu"
+)
+
+# View results
+print(fit)
+summary(fit)
+
+# Extract parameters
+params <- coef(fit)
+head(params)
+```
+
+### What You Get
+
+The LWU model estimates three parameters per voxel:
+
+- **tau (τ)**: Time to peak in seconds (normal: 4-8s)
+- **sigma (σ)**: Width/duration of response (normal: 1.5-4s)  
+- **rho (ρ)**: Undershoot amplitude (normal: 0.2-0.6)
+
+## Using with fmrireg
+
+For real fMRI analysis, integrate with the `fmrireg` package:
+
+```{r fmrireg-example, eval=FALSE}
+library(fmrireg)
+
+# Load your fMRI data
+fmri_data <- fmri_dataset(
+  scans = "path/to/functional.nii.gz",
+  mask = "path/to/mask.nii.gz",
+  TR = 2,
+  run_length = 300
+)
+
+# Define your events
+events_df <- data.frame(
+  onset = c(10, 30, 50, 70, 90),  # in seconds
+  duration = rep(1, 5),            # event duration
+  condition = "stimulus"
+)
+
+# Create event model
+event_model <- event_model(
+  ~ hrf(condition, basis = "spmg1"),  # placeholder basis
+  data = events_df,
+  sampling_frame = fmri_data
+)
+
+# Estimate parametric HRFs
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  verbose = TRUE
+)
+```
+
+## Key Options
+
+### Better Initialization
+
+Use data-driven starting values:
+
+```{r data-driven, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = bold_data,
+  event_model = event_matrix,
+  theta_seed = "data_driven"  # Instead of default values
+)
+```
+
+### Global Refinement
+
+Iterate to improve estimates:
+
+```{r refinement, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = bold_data,
+  event_model = event_matrix,
+  global_refinement = TRUE,
+  global_passes = 3  # Number of iterations
+)
+```
+
+### Standard Errors
+
+Get uncertainty estimates:
+
+```{r standard-errors, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = bold_data,
+  event_model = event_matrix,
+  compute_se = TRUE
+)
+
+# Extract standard errors
+se_params <- coef(fit, type = "se")
+```
+
+### Parallel Processing
+
+Speed up large analyses:
+
+```{r parallel, eval=FALSE}
+fit <- estimate_parametric_hrf(
+  fmri_data = bold_data,
+  event_model = event_matrix,
+  parallel = TRUE,
+  n_cores = 4
+)
+```
+
+## Interpreting Results
+
+### Check Fit Quality
+
+```{r fit-quality, eval=FALSE}
+# R-squared values indicate fit quality
+r2_values <- fit$fit_quality$r_squared
+
+# Good fits have R² > 0.5
+good_voxels <- which(r2_values > 0.5)
+percent_good <- 100 * length(good_voxels) / length(r2_values)
+
+cat("Percentage of well-fit voxels:", round(percent_good, 1), "%\n")
+```
+
+### Visualize Parameters
+
+```{r visualize, eval=FALSE}
+# If you have spatial information
+library(neuroim2)
+
+# Create parameter maps
+tau_map <- NeuroVol(geometry = mask_geometry, data = params[, "tau"])
+sigma_map <- NeuroVol(geometry = mask_geometry, data = params[, "sigma"])
+rho_map <- NeuroVol(geometry = mask_geometry, data = params[, "rho"])
+
+# Write to file
+write_vol(tau_map, "tau_map.nii.gz")
+write_vol(sigma_map, "sigma_map.nii.gz")
+write_vol(rho_map, "rho_map.nii.gz")
+```
+
+## Tips for Success
+
+1. **Start Simple**: Use default settings first, then add complexity
+
+2. **Check Your Events**: Ensure event timing aligns with your TR
+
+3. **Quality Control**: Always check R² values and parameter distributions
+
+4. **Mask Wisely**: Use a brain mask to avoid fitting noise
+
+5. **Be Patient**: Large datasets can take time; use parallel processing
+
+## Getting Help
+
+- **Documentation**: `?estimate_parametric_hrf`
+- **Vignettes**: `browseVignettes("fmriparametric")`
+- **Issues**: https://github.com/bbuchsbaum/fmriparametric/issues
+
+## Next Steps
+
+For a deeper understanding of the method, see the full vignette:
+
+```{r next-steps, eval=FALSE}
+vignette("parametric-hrf-estimation", package = "fmriparametric")
+```

@@ -1,0 +1,7 @@
+# Ignore built vignettes
+*.html
+*.R
+
+# But keep the source files
+!*.Rmd
+!README.md
