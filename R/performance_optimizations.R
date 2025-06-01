@@ -2,36 +2,6 @@
 # ===================================
 # These can be implemented TODAY for 2-10x speedups
 
-# 1. VECTORIZED CONVOLUTION (2-3x speedup)
-# Current: Loop over basis functions
-# Better: Single FFT operation for all bases
-.fast_batch_convolution <- function(signal, kernels, n_out) {
-  n_kernels <- ncol(kernels)
-  kernel_length <- nrow(kernels)
-  
-  # Pad to optimal FFT size
-  n_fft <- nextn(n_out + kernel_length - 1, factors = 2)
-  
-  # FFT of signal (computed once)
-  signal_fft <- fft(c(signal, rep(0, n_fft - length(signal))))
-  
-  # Batch process all kernels
-  design_matrix <- matrix(0, n_out, n_kernels)
-  
-  # Vectorized kernel FFTs
-  kernels_padded <- rbind(kernels, matrix(0, n_fft - kernel_length, n_kernels))
-  kernels_fft <- mvfft(kernels_padded)
-  
-  # Multiply in frequency domain (vectorized)
-  conv_fft <- signal_fft * kernels_fft
-  
-  # Batch IFFT
-  conv_time <- mvfft(conv_fft, inverse = TRUE) / n_fft
-  design_matrix <- Re(conv_time[1:n_out, ])
-  
-  return(design_matrix)
-}
-
 # 2. CACHED QR DECOMPOSITIONS (5x speedup for iterations)
 # Create environment for caching
 .qr_cache <- new.env(parent = emptyenv())

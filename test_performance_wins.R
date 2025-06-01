@@ -5,7 +5,7 @@ cat("╔════════════════════════
 cat("║              TESTING PERFORMANCE ENHANCEMENTS                ║\n")
 cat("╚══════════════════════════════════════════════════════════════╝\n\n")
 
-source("R/performance_enhancements.R")
+source("R/fast_batch_convolution.R")
 
 # Test 1: Batch FFT Convolution
 cat("Test 1: Batch FFT Convolution Speed\n")
