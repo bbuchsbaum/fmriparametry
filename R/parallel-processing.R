@@ -8,7 +8,7 @@
 #' 
 #' @return List with parallel configuration info
 #' @keywords internal
-.setup_parallel_backend_v2 <- function(n_cores = NULL, verbose = TRUE) {
+.setup_parallel_backend <- function(n_cores = NULL, verbose = TRUE) {
   # Check available cores
   available_cores <- parallel::detectCores()
   

@@ -227,8 +227,10 @@ estimate_parametric_hrf <- function(
   if (verbose) cat("\n→ Stage 2: Core parametric estimation...\n")
   
   # Setup parallel backend if requested
+  parallel_config <- NULL
   if (parallel) {
-    n_cores <- .setup_parallel_backend(n_cores, n_vox, verbose)
+    parallel_config <- .setup_parallel_backend(n_cores = n_cores, verbose = verbose)
+    n_cores <- parallel_config$n_cores
     process_function <- .parametric_engine_parallel
   } else {
     process_function <- .parametric_engine
@@ -539,18 +541,25 @@ estimate_parametric_hrf <- function(
       n_cores = n_cores,
       safety_mode = safety_mode
     ),
+    parallel_info = if (!is.null(parallel_config)) list(
+      backend = parallel_config$backend,
+      n_cores = parallel_config$n_cores
+    ) else list(
+      backend = "sequential",
+      n_cores = 1
+    ),
     timing = list(
       total_seconds = total_time,
       voxels_per_second = n_vox / total_time
     ),
     version = "ultimate_impeccable_v1.0"
   )
-  
+
   # Clean up parallel backend
-  if (parallel) {
-    .cleanup_parallel_backend()
+  if (!is.null(parallel_config)) {
+    parallel_config$cleanup()
   }
-  
+
   # Ensure theta_current is a proper matrix
   if (!is.matrix(theta_current)) {
     theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
@@ -600,39 +609,6 @@ estimate_parametric_hrf <- function(
   )
 }
 
-# Helper for parallel setup
-.setup_parallel_backend <- function(n_cores, n_vox, verbose) {
-  if (is.null(n_cores)) {
-    n_cores <- min(parallel::detectCores() - 1, ceiling(n_vox / 100))
-  }
-  
-  if (verbose) {
-    cat(sprintf("  Setting up parallel backend with %d cores...\n", n_cores))
-  }
-  
-  # Platform-specific setup
-  if (.Platform$OS.type == "unix") {
-    # Use forking on Unix (more efficient)
-    options(mc.cores = n_cores)
-  } else {
-    # Use PSOCK cluster on Windows
-    cl <- parallel::makeCluster(n_cores)
-    options(parallelly.cluster = cl)
-  }
-  
-  return(n_cores)
-}
-
-# Cleanup parallel backend
-.cleanup_parallel_backend <- function() {
-  if (.Platform$OS.type != "unix") {
-    cl <- getOption("parallelly.cluster")
-    if (!is.null(cl)) {
-      parallel::stopCluster(cl)
-      options(parallelly.cluster = NULL)
-    }
-  }
-}
 
 # ========== HELPER FUNCTION IMPLEMENTATIONS ==========
 
