@@ -1,35 +1,8 @@
-#' Estimate parametric HRF parameters (ULTIMATE IMPECCABLE VERSION)
+#' Estimate parametric HRF parameters
 #'
-#' This is the ONE TRUE implementation of parametric HRF estimation, combining
-#' ALL features from Sprints 1-3 into a single, impeccable interface. Having
-#' multiple functions with the same name is UNIMPECCABLE. This resolves that.
-#'
-#' @details
-#' This function implements a sophisticated multi-stage algorithm:
-#'
-#' **Stage 1: Initialization**
-#' - Data-driven seed selection (if requested)
-#' - K-means clustering for spatial patterns (if K > 0)
-#'
-#' **Stage 2: Core Estimation**
-#' - Single-pass Taylor approximation
-#' - Ridge regularization for stability
-#' - Parameter bounds enforcement
-#'
-#' **Stage 3: Iterative Refinement** (if enabled)
-#' - Global re-centering passes
-#' - Local K-means re-centering
-#' - Convergence monitoring
-#'
-#' **Stage 4: Tiered Refinement** (if enabled)
-#' - Easy voxels: Keep as-is (high R²)
-#' - Moderate voxels: Local re-centering
-#' - Hard voxels: Gauss-Newton optimization
-#'
-#' **Stage 5: Statistical Inference**
-#' - Standard errors via Delta method
-#' - R-squared computation
-#' - Residual analysis
+#' Estimate hemodynamic response function parameters from fMRI time series using
+#' a parametric HRF model. Optional refinement steps improve fits for challenging
+#' voxels.
 #' 
 #' @section Package Options:
 #' Global iterative refinement (Stage 3) is controlled by the option
@@ -71,25 +44,14 @@
 #'   - metadata: Complete analysis metadata
 #'
 #' @examples
-#' \dontrun{
-#' # Basic usage (Sprint 1 features only)
-#' fit <- estimate_parametric_hrf(
-#'   fmri_data = my_data,
-#'   event_model = my_events
-#' )
-#'
-#' # Advanced usage with all features
-#' fit <- estimate_parametric_hrf(
-#'   fmri_data = my_data,
-#'   event_model = my_events,
-#'   theta_seed = "data_driven",
-#'   global_refinement = TRUE,
-#'   kmeans_refinement = TRUE,
-#'   tiered_refinement = "aggressive",
-#'   parallel = TRUE,
-#'   n_cores = 8
-#' )
-#' }
+#' # Simulated quick example
+#' set.seed(1)
+#' fmri_data <- matrix(rnorm(40), nrow = 20, ncol = 2)
+#' events <- matrix(0, nrow = 20, ncol = 1)
+#' events[c(5, 15), 1] <- 1
+#' fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
+#'                                verbose = FALSE)
+#' summary(fit)
 #'
 #' @export
 estimate_parametric_hrf <- function(
@@ -144,7 +106,7 @@ estimate_parametric_hrf <- function(
   # Initialize progress tracking if requested
   if (progress && verbose) {
     cat("╔══════════════════════════════════════════════════════════════╗\n")
-    cat("║        PARAMETRIC HRF ESTIMATION (IMPECCABLE VERSION)        ║\n")
+    cat("║             Parametric HRF estimation in progress            ║\n")
     cat("╚══════════════════════════════════════════════════════════════╝\n\n")
   }
   

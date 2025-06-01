@@ -1,0 +1,50 @@
+---
+title: "Getting started with parametric HRF estimation"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with parametric HRF estimation}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Introduction
+
+This short tutorial demonstrates the basic workflow for estimating a parametric
+hemodynamic response function (HRF) from an fMRI time series. The underlying
+algorithm implements the goals outlined in the project proposal: efficient
+voxel-wise estimation of interpretable HRF parameters with optional refinement.
+
+## Simulated example
+
+```{r}
+library(fmriparametric)
+
+# Create a small synthetic dataset
+set.seed(1)
+fmri_data <- matrix(rnorm(40), nrow = 20, ncol = 2)
+
+events <- matrix(0, nrow = 20, ncol = 1)
+events[c(5, 15), 1] <- 1
+
+# Estimate HRF parameters
+fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
+                               verbose = FALSE)
+summary(fit)
+```
+
+## Diagnostic plot
+
+```{r, fig.width=6, fig.height=4}
+plot(fit)
+```
+
+The estimated HRF shape and parameter distributions help assess model fit. The
+package design follows the proposal's aim of providing robust, interpretable
+estimates in a few straightforward steps.

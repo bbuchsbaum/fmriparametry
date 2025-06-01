@@ -1,8 +1,7 @@
-#' TEST COMPATIBILITY LAYER
+#' Test compatibility layer
 #'
 #' Provides backward-compatible functions for existing tests while routing
-#' to our new consolidated implementation. This ensures tests pass while
-#' maintaining our IMPECCABLE consolidation.
+#' to the consolidated implementation.
 
 #' Compatibility wrapper for iterative engine (from v2/v3)
 #' Routes to our new consolidated version with appropriate parameters
