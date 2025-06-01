@@ -1,7 +1,7 @@
 Package: fmriparametric
 Type: Package
 Title: Extensible Parametric HRF Estimation for fMRI Data
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: 
     person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
            comment = c(ORCID = "YOUR-ORCID-ID"))
@@ -16,11 +16,11 @@ License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.0
+RoxygenNote: 7.3.2.9000
 Depends:
     R (>= 4.1.0)
 Imports:
-    fmrireg (>= 0.2.0),
+    fmrireg (>= 0.1.0),
     assertthat,
     Matrix,
     RcppEigen,

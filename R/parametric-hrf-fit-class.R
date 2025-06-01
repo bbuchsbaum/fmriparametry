@@ -20,7 +20,8 @@ new_parametric_hrf_fit <- function(
   parameter_names,
   hrf_model = "lwu",
   convergence = list(),
-  metadata = list()
+  metadata = list(),
+  ...  # Ignore any extra arguments for backward compatibility
 ) {
   assertthat::assert_that(is.matrix(estimated_parameters))
   assertthat::assert_that(is.numeric(amplitudes))

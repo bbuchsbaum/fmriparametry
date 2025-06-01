@@ -1,0 +1,383 @@
+---
+title: "Advanced Features in fmriparametric"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Advanced Features in fmriparametric}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+```{r setup}
+library(fmriparametric)
+```
+
+## Introduction
+
+This vignette covers the advanced features available in `fmriparametric` version 3.0, including:
+
+- K-means spatial clustering for heterogeneous data
+- Tiered refinement system for challenging voxels
+- Parallel processing capabilities
+- Enhanced diagnostics and visualization
+
+These features are designed to handle real-world fMRI data with spatial heterogeneity, poor signal-to-noise ratios, and computational demands of whole-brain analysis.
+
+## K-means Spatial Clustering
+
+When HRF characteristics vary across brain regions, global parameter estimates may not adequately capture local variations. The K-means clustering approach identifies spatial clusters with similar HRF properties and refines estimates within each cluster.
+
+### Basic Usage
+
+```{r kmeans-example, eval=FALSE}
+# Enable K-means clustering
+fit_kmeans <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  recenter_kmeans_passes = 2,  # Number of K-means iterations
+  kmeans_k = 5,                # Number of clusters
+  r2_threshold_kmeans = 0.7,   # Include voxels with R² > 0.7 in clustering
+  verbose = TRUE
+)
+```
+
+### How It Works
+
+1. **Voxel Selection**: High-quality voxels (R² > threshold) are selected for clustering
+2. **Parameter Transformation**: Parameters are normalized for clustering (e.g., log-transform width)
+3. **Clustering**: K-means identifies clusters in parameter space
+4. **Refinement**: Each cluster's centroid becomes a new expansion point for Taylor approximation
+5. **Update**: Voxels are re-estimated using their cluster's expansion point
+
+### When to Use K-means
+
+K-means clustering is particularly beneficial when:
+
+- Analyzing whole-brain data with diverse regions
+- HRF characteristics show clear spatial patterns
+- Standard global refinement plateaus at suboptimal solutions
+- You have sufficient high-quality voxels for reliable clustering
+
+## Tiered Refinement System
+
+Not all voxels are equally difficult to fit. The tiered refinement system classifies voxels based on fit quality and applies appropriate refinement strategies.
+
+### Refinement Queues
+
+Voxels are classified into three queues:
+
+1. **Easy** (R² > 0.7, low SE): Well-fit voxels requiring no refinement
+2. **Moderate** (0.3 < R² < 0.7): Benefit from local re-centering
+3. **Hard** (R² < 0.3 or high SE): Require full Gauss-Newton optimization
+
+### Configuration
+
+```{r refinement-example, eval=FALSE}
+# Configure refinement thresholds
+fit_refined <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  refinement_opts = list(
+    apply_refinement = TRUE,
+    r2_threshold_hard = 0.3,      # Voxels below this are "hard"
+    r2_threshold_moderate = 0.7,  # Voxels below this are "moderate"
+    se_threshold_hard = 0.5,      # High SE indicates "hard" voxel
+    se_threshold_moderate = 0.3,  # Medium SE indicates "moderate"
+    max_iter_gn = 10              # Maximum Gauss-Newton iterations
+  ),
+  compute_se = TRUE,  # Required for SE-based classification
+  verbose = TRUE
+)
+
+# Check refinement results
+summary(fit_refined)
+```
+
+### Refinement Strategies
+
+#### Local Re-centering (Moderate Voxels)
+- Uses each voxel's current estimate as expansion point
+- Single Taylor approximation pass
+- Updates only if R² improves
+- Computationally efficient
+
+#### Gauss-Newton Optimization (Hard Voxels)
+- Full nonlinear optimization
+- Iterative parameter updates with line search
+- Handles cases far from initial estimates
+- More computationally intensive but powerful
+
+## Parallel Processing
+
+For large datasets, parallel processing can significantly reduce computation time.
+
+### Setup
+
+```{r parallel-example, eval=FALSE}
+# Automatic core detection
+fit_parallel <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  n_cores = NULL,  # Auto-detect available cores
+  progress = TRUE
+)
+
+# Specify core count
+fit_parallel <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  n_cores = 8,
+  progress = TRUE
+)
+```
+
+### Parallel Operations
+
+The following operations are parallelized:
+
+1. K-means cluster processing
+2. Local re-centering for moderate voxels
+3. Gauss-Newton optimization for hard voxels
+4. Standard error calculations
+
+### Backend Support
+
+The package automatically selects the best available backend:
+
+- **Unix/macOS**: `future::multicore` or `parallel::mclapply`
+- **Windows**: `future::multisession` or `parallel::parLapply`
+- **Fallback**: Sequential processing if no parallel backend available
+
+## Rock-Solid Mode
+
+For production environments or challenging datasets, use the bulletproof `estimate_parametric_hrf_rock_solid` function:
+
+```{r rock-solid-example, eval=FALSE}
+# Maximum safety mode
+fit_safe <- estimate_parametric_hrf_rock_solid(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  safety_mode = "maximum",  # Most conservative
+  error_report = TRUE,      # Detailed diagnostics
+  verbose = TRUE
+)
+
+# Check error recovery
+if (fit_safe$metadata$errors_recovered > 0) {
+  print(fit_safe$error_report)
+}
+```
+
+### Safety Modes
+
+- **Maximum**: All safety checks, multiple fallbacks, detailed diagnostics
+- **Balanced**: Standard safety features, good performance
+- **Performance**: Minimal overhead, for clean data
+
+## Enhanced Diagnostics
+
+### Visualization
+
+The enhanced plot method provides multiple diagnostic views:
+
+```{r plot-example, eval=FALSE}
+# View fitted HRF curves
+plot(fit_refined, type = "hrf", n_curves = 20)
+
+# Parameter distributions
+plot(fit_refined, type = "parameters")
+
+# Diagnostic plots (R² distribution, parameter vs R²)
+plot(fit_refined, type = "diagnostic")
+
+# Refinement queue visualization
+plot(fit_refined, type = "refinement")
+```
+
+### Summary Statistics
+
+The summary method now includes refinement information:
+
+```{r summary-example, eval=FALSE}
+summ <- summary(fit_refined)
+
+# Refinement summary
+print(summ$refinement_summary)
+
+# R-squared breakdown
+cat("Excellent fits (R² > 0.7):", 
+    round(100 * summ$r_squared_summary$prop_excellent, 1), "%\n")
+cat("Failed fits (R² < 0.1):", 
+    summ$r_squared_summary$n_failed, "voxels\n")
+```
+
+## Performance Optimization Tips
+
+### 1. Choosing Parameters
+
+```{r optimization-tips, eval=FALSE}
+# For speed (large datasets, initial exploration)
+fit_fast <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  recenter_global_passes = 1,    # Fewer global iterations
+  recenter_kmeans_passes = 0,    # Skip K-means
+  refinement_opts = list(apply_refinement = FALSE),  # No refinement
+  compute_se = FALSE,            # Skip SE calculation
+  n_cores = parallel::detectCores() - 1
+)
+
+# For accuracy (final analysis, publication)
+fit_accurate <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  theta_seed = "data_median",    # Data-driven initialization
+  recenter_global_passes = 3,    # More global iterations
+  recenter_kmeans_passes = 2,    # K-means clustering
+  kmeans_k = 7,                  # More clusters
+  refinement_opts = list(
+    apply_refinement = TRUE,
+    r2_threshold_hard = 0.4,     # More aggressive refinement
+    r2_threshold_moderate = 0.8,
+    max_iter_gn = 15
+  ),
+  compute_se = TRUE,
+  n_cores = parallel::detectCores() - 1
+)
+```
+
+### 2. Memory Management
+
+For very large datasets:
+
+```{r memory-tips, eval=FALSE}
+# Process ROI separately
+roi_mask <- create_mask(roi_coordinates)
+fit_roi <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  mask = roi_mask,  # Reduces memory usage
+  n_cores = 4       # Limit cores to control memory
+)
+
+# Or use rock-solid mode with automatic chunking
+fit_large <- estimate_parametric_hrf_rock_solid(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  safety_mode = "balanced"  # Includes memory management
+)
+```
+
+### 3. Troubleshooting Poor Fits
+
+If many voxels have poor fits:
+
+```{r troubleshooting, eval=FALSE}
+# 1. Check data quality
+summ <- summary(fit_initial)
+hist(summ$r_squared_summary$summary, main = "R² Distribution")
+
+# 2. Try data-driven initialization
+fit_data_init <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  theta_seed = "data_median"
+)
+
+# 3. Adjust parameter bounds
+fit_wider_bounds <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  theta_bounds = list(
+    lower = c(1, 0.5, 0),    # Wider bounds
+    upper = c(15, 6, 1)
+  )
+)
+
+# 4. Increase regularization for noisy data
+fit_regularized <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  lambda_ridge = 0.1  # Higher regularization
+)
+```
+
+## Complete Example
+
+Here's a complete workflow using all advanced features:
+
+```{r complete-example, eval=FALSE}
+# Load data
+library(fmriparametric)
+library(fmrireg)
+
+# Prepare data
+fmri_data <- read_fmri("subject01_bold.nii.gz")
+events <- read.csv("subject01_events.csv")
+event_model <- event_model(onset ~ condition, data = events)
+
+# Initial fit with basic settings
+fit_initial <- estimate_parametric_hrf_v3(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  verbose = TRUE
+)
+
+# Check initial quality
+summary(fit_initial)
+plot(fit_initial, type = "diagnostic")
+
+# If needed, apply advanced features
+if (mean(fit_initial$r_squared < 0.7) > 0.3) {  # >30% poor fits
+  message("Applying advanced refinement...")
+  
+  fit_advanced <- estimate_parametric_hrf_v3(
+    fmri_data = fmri_data,
+    event_model = event_model,
+    theta_seed = "data_median",
+    recenter_global_passes = 3,
+    recenter_kmeans_passes = 2,
+    kmeans_k = 5,
+    refinement_opts = list(
+      apply_refinement = TRUE,
+      r2_threshold_hard = 0.3,
+      r2_threshold_moderate = 0.7,
+      max_iter_gn = 10
+    ),
+    compute_se = TRUE,
+    n_cores = parallel::detectCores() - 1,
+    verbose = TRUE
+  )
+  
+  # Compare results
+  cat("Mean R² improved from", round(mean(fit_initial$r_squared), 3),
+      "to", round(mean(fit_advanced$r_squared), 3), "\n")
+  
+  # Visualize improvements
+  plot(fit_advanced, type = "refinement")
+}
+
+# Extract results
+parameters <- coef(fit_advanced)
+param_brain <- unmask(parameters[, "tau"], brain_mask)
+write_nifti(param_brain, "tau_map.nii.gz")
+```
+
+## Conclusion
+
+The advanced features in `fmriparametric` v3.0 provide powerful tools for handling challenging real-world fMRI data:
+
+- **K-means clustering** adapts to spatial heterogeneity
+- **Tiered refinement** efficiently handles voxels of varying difficulty
+- **Parallel processing** enables whole-brain analysis
+- **Rock-solid mode** ensures reliable results even with pathological data
+
+These features work together to provide accurate, efficient, and robust parametric HRF estimation for modern fMRI analyses.

@@ -7,6 +7,11 @@
 #' @keywords internal
 .lwu_hrf_function <- function(t, params_vector, ...) {
   assertthat::assert_that(length(params_vector) == 3)
+  
+  # Enforce LWU parameter bounds to prevent fmrireg errors
+  bounds <- .lwu_hrf_default_bounds()
+  params_vector <- pmax(bounds$lower, pmin(params_vector, bounds$upper))
+  
   fmrireg::hrf_lwu(t = t,
                    tau = params_vector[1],
                    sigma = params_vector[2],
@@ -24,6 +29,11 @@
 #' @keywords internal
 .lwu_hrf_taylor_basis_function <- function(params_vector0, t_hrf_eval, ...) {
   assertthat::assert_that(length(params_vector0) == 3)
+  
+  # Enforce LWU parameter bounds to prevent fmrireg errors
+  bounds <- .lwu_hrf_default_bounds()
+  params_vector0 <- pmax(bounds$lower, pmin(params_vector0, bounds$upper))
+  
   basis <- fmrireg::hrf_basis_lwu(theta0 = params_vector0,
                                   t = t_hrf_eval,
                                   normalize_primary = "none",

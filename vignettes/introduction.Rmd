@@ -1,0 +1,223 @@
+---
+title: "Introduction to fmriparametric"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to fmriparametric}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Overview
+
+The `fmriparametric` package provides tools for estimating parameters of parametric Hemodynamic Response Function (HRF) models from fMRI data. This vignette introduces the basic concepts and demonstrates the core functionality.
+
+## Installation
+
+```{r eval=FALSE}
+# Install from GitHub
+devtools::install_github("bbuchsbaum/fmrireg")  # Required dependency
+devtools::install_github("bbuchsbaum/fmriparametry")
+```
+
+## Basic Concepts
+
+### The Hemodynamic Response Function (HRF)
+
+The HRF describes how neural activity translates into the BOLD signal measured by fMRI. Instead of assuming a fixed HRF shape, parametric models allow the HRF to vary across brain regions by estimating interpretable parameters.
+
+### The Lag-Width-Undershoot (LWU) Model
+
+The LWU model characterizes the HRF using three parameters:
+
+1. **τ (tau)**: Lag or time-to-peak
+2. **σ (sigma)**: Width of the response
+3. **ρ (rho)**: Undershoot amplitude
+
+The mathematical form is:
+$$h(t; \tau, \sigma, \rho) = e^{-\frac{(t-\tau)^2}{2\sigma^2}} - \rho \cdot e^{-\frac{(t-\tau-2\sigma)^2}{2(1.6\sigma)^2}}$$
+
+## Basic Usage
+
+### Simulated Example
+
+```{r eval=FALSE}
+library(fmriparametric)
+library(fmrireg)
+
+# Simulate fMRI data
+set.seed(123)
+n_time <- 200
+n_voxels <- 100
+TR <- 2
+
+# Create event timing
+events <- data.frame(
+  onset = seq(20, 180, by = 40),
+  duration = rep(1, 5),
+  trial_type = "stimulus"
+)
+
+# Generate synthetic BOLD data
+# In practice, you would load real fMRI data
+Y <- matrix(rnorm(n_time * n_voxels), nrow = n_time)
+
+# Create event model
+event_model <- fmrireg::event_model(
+  onset ~ trial_type,
+  data = events,
+  sampling_rate = 1/TR
+)
+
+# Create fMRI dataset
+fmri_data <- fmrireg::matrix_dataset(
+  Y,
+  sampling_rate = 1/TR,
+  TR = TR
+)
+
+# Estimate parametric HRF
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  verbose = TRUE
+)
+
+# View results
+print(fit)
+```
+
+### Real Data Example
+
+```{r eval=FALSE}
+# Load real fMRI data
+fmri_data <- fmrireg::read_fmri("path/to/functional.nii.gz")
+mask <- fmrireg::read_fmri("path/to/brain_mask.nii.gz")
+
+# Load event timing
+events <- read.csv("path/to/events.csv")
+
+# Create event model
+event_model <- fmrireg::event_model(
+  onset ~ trial_type,
+  data = events,
+  sampling_rate = 1/TR
+)
+
+# Estimate with mask
+fit <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  mask = mask,
+  verbose = TRUE
+)
+```
+
+## Interpreting Results
+
+### Parameter Estimates
+
+```{r eval=FALSE}
+# Extract parameters
+params <- coef(fit)
+
+# Examine tau (time-to-peak)
+hist(params[, "tau"], main = "Distribution of Time-to-Peak", 
+     xlab = "Tau (seconds)")
+
+# Examine sigma (width)
+hist(params[, "sigma"], main = "Distribution of Response Width",
+     xlab = "Sigma (seconds)")
+
+# Examine rho (undershoot)
+hist(params[, "rho"], main = "Distribution of Undershoot Amplitude",
+     xlab = "Rho")
+```
+
+### Summary Statistics
+
+```{r eval=FALSE}
+# Get summary
+summ <- summary(fit)
+print(summ$parameter_summary)
+```
+
+## Advanced Options
+
+### Custom Parameter Bounds
+
+```{r eval=FALSE}
+# Restrict parameters to specific ranges
+fit_constrained <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  theta_bounds = list(
+    lower = c(tau = 3, sigma = 1, rho = 0),
+    upper = c(tau = 9, sigma = 4, rho = 0.6)
+  )
+)
+```
+
+### Custom Starting Values
+
+```{r eval=FALSE}
+# Use informed starting values
+fit_custom_start <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  theta_seed = c(tau = 5, sigma = 2, rho = 0.3)
+)
+```
+
+### Adjusting Regularization
+
+```{r eval=FALSE}
+# Increase ridge penalty for more stable estimates
+fit_regularized <- estimate_parametric_hrf(
+  fmri_data = fmri_data,
+  event_model = event_model,
+  parametric_hrf = "lwu",
+  lambda_ridge = 0.1  # Default is 0.01
+)
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Poor fits in some voxels**: This can occur with low SNR data. Consider:
+   - Increasing `lambda_ridge` for more regularization
+   - Using a brain mask to exclude non-brain voxels
+   - Checking your event timing
+
+2. **Parameters at bounds**: If many voxels have parameters at the bounds:
+   - Review your bound settings
+   - Check data quality
+   - Consider different starting values
+
+3. **Slow performance**: For large datasets:
+   - Use a mask to reduce voxel count
+   - Future versions will support parallel processing
+
+## Next Steps
+
+- Explore the parameter maps to identify regions with distinct HRF properties
+- Compare HRF parameters between conditions or groups
+- Use the estimated HRFs for more accurate GLM analyses
+
+## References
+
+For more details on the Taylor approximation method and parametric HRF models, see:
+
+- [Reference to relevant paper once published]
+- fmrireg package documentation: https://github.com/bbuchsbaum/fmrireg
