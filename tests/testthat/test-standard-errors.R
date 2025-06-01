@@ -205,10 +205,11 @@ test_that("SEs accessible through coef method", {
   S <- matrix(rbinom(20, 1, 0.3), ncol = 1)
   
   # Fit with SEs
-  fit <- estimate_parametric_hrf_v2(
+  fit <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = S,
-    recenter_global_passes = 1,
+    global_refinement = TRUE,
+    global_passes = 1,
     compute_se = TRUE,
     verbose = FALSE
   )

@@ -31,17 +31,76 @@
   lambda_ridge = 0.01,
   verbose = FALSE
 ) {
-  
-  # Use simple, dependency-free engine for stability
-  .parametric_engine_simple(
-    Y_proj = Y_proj,
-    S_target_proj = S_target_proj,
-    scan_times = scan_times,
-    hrf_eval_times = hrf_eval_times,
-    hrf_interface = hrf_interface,
-    theta_seed = theta_seed,
-    theta_bounds = theta_bounds,
-    lambda_ridge = lambda_ridge,
-    verbose = verbose
+  n_time   <- nrow(Y_proj)
+  n_vox    <- ncol(Y_proj)
+  n_params <- length(theta_seed)
+
+  if (verbose) {
+    cat("Parametric engine: ", n_vox, " voxels, ", n_params,
+        " parameters\n", sep = "")
+  }
+
+  # 1. Taylor basis at expansion point
+  X_basis <- hrf_interface$taylor_basis(theta_seed, hrf_eval_times)
+  if (!is.matrix(X_basis)) {
+    X_basis <- matrix(X_basis, ncol = n_params + 1)
+  }
+
+  # 2. Convolve stimulus with basis functions
+  X_design <- matrix(0, nrow = n_time, ncol = ncol(X_basis))
+  for (j in seq_len(ncol(X_basis))) {
+    basis_col <- X_basis[, j]
+    design_col <- numeric(n_time)
+    for (k in seq_len(ncol(S_target_proj))) {
+      s_col <- S_target_proj[, k]
+      conv_full <- stats::convolve(s_col, rev(basis_col), type = "open")
+      design_col <- design_col + conv_full[seq_len(n_time)]
+    }
+    X_design[, j] <- design_col
+  }
+
+  # 3. Linear solution with ridge regularisation
+  qr_decomp <- qr(X_design)
+  Q <- qr.Q(qr_decomp)
+  R <- qr.R(qr_decomp)
+  R_ridge <- R + lambda_ridge * diag(ncol(R))
+  coeffs <- solve(R_ridge, t(Q) %*% Y_proj)
+
+  # 4. Extract amplitude and parameter updates
+  beta0 <- coeffs[1, ]
+  beta0_safe <- ifelse(abs(beta0) < 1e-6, sign(beta0) * 1e-6, beta0)
+  delta_theta <- coeffs[2:(n_params + 1), , drop = FALSE] /
+    matrix(rep(beta0_safe, each = n_params), nrow = n_params)
+
+  theta_hat <- matrix(theta_seed, nrow = n_vox, ncol = n_params, byrow = TRUE) +
+    t(delta_theta)
+
+  # 5. Apply bounds if provided
+  if (!is.null(theta_bounds)) {
+    for (j in seq_len(n_params)) {
+      theta_hat[, j] <- pmax(theta_bounds$lower[j],
+                            pmin(theta_hat[, j], theta_bounds$upper[j]))
+    }
+  }
+
+  if (!is.null(hrf_interface$parameter_names)) {
+    colnames(theta_hat) <- hrf_interface$parameter_names
+  }
+
+  # 6. Fit quality metrics
+  fitted_values <- X_design %*% coeffs
+  residuals <- Y_proj - fitted_values
+  y_mean <- matrix(colMeans(Y_proj), nrow = n_time, ncol = n_vox, byrow = TRUE)
+  ss_tot <- colSums((Y_proj - y_mean)^2)
+  ss_res <- colSums(residuals^2)
+  r_squared <- ifelse(ss_tot > 1e-10, 1 - ss_res / ss_tot, 0)
+  r_squared <- pmax(0, pmin(1, r_squared))
+
+  list(
+    theta_hat = theta_hat,
+    beta0 = as.numeric(beta0),
+    r_squared = as.numeric(r_squared),
+    residuals = residuals,
+    coeffs = coeffs
   )
 }
