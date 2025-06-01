@@ -6,3 +6,8 @@ fast_batch_convolution_cpp <- function(signal, kernels, output_length) {
 }
 
 
+
+ridge_linear_solve_cpp <- function(X, Y, lambda) {
+  .Call(`_fmriparametric_ridge_linear_solve_cpp`, X, Y, lambda)
+}
+

@@ -95,13 +95,8 @@
     }
     
     # Global QR decomposition
-    qr_decomp <- qr(X_design)
-    Q <- qr.Q(qr_decomp)
-    R <- qr.R(qr_decomp)
-    R_inv <- solve(R + lambda_ridge * diag(ncol(R)))
-    
-    # Voxel-wise estimation
-    coeffs_pass <- R_inv %*% t(Q) %*% Y_proj
+    # Use fast C++ ridge solver
+    coeffs_pass <- .ridge_linear_solve(X_design, Y_proj, lambda_ridge)
     beta0_pass <- coeffs_pass[1, ]
     beta0_safe <- ifelse(abs(beta0_pass) < epsilon_beta, epsilon_beta, beta0_pass)
     delta_theta <- coeffs_pass[2:(n_params+1), , drop = FALSE] / 

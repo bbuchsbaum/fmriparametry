@@ -31,7 +31,8 @@ Imports:
     stats
 LinkingTo:
     Rcpp,
-    RcppParallel
+    RcppParallel,
+    RcppEigen
 Suggests:
     future,
     progressr,

@@ -1,7 +1,6 @@
-#' SMART PERFORMANCE DISPATCHER
-#' 
+#' Smart performance dispatcher
+#'
 #' Automatically selects the optimal algorithm based on problem characteristics.
-#' This is what IMPECCABLE engineering looks like - the code optimizes itself!
 
 #' Smart convolution dispatcher
 #' 
