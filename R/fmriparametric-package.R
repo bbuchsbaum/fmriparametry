@@ -71,11 +71,22 @@
 if(getRversion() >= "2.15.1") {
   utils::globalVariables(c(
     # Variables from various functions
-    ".parametric_engine_direct", "Count", "Queue", "amplitudes", 
-    "ff", "get_fmri_dimensions", "hrf", "load_fmri_chunk", 
-    "parameter", "queue", "r2", "r2_initial", "theta_current", 
+    ".parametric_engine_direct", "Count", "Queue", "amplitudes",
+    "ff", "get_fmri_dimensions", "hrf", "load_fmri_chunk",
+    "parameter", "queue", "r2", "r2_initial", "theta_current",
     "value", "voxel", "voxel_idx",
     # Variables from ggplot2 usage
     "voxel_id", "time", "response", "residual"
   ))
+}
+
+# Initialize package options
+.onLoad <- function(libname, pkgname) {
+  op <- options()
+  op.fmrip <- list(
+    fmriparametric.refine_global = TRUE
+  )
+  toset <- !(names(op.fmrip) %in% names(op))
+  if (any(toset)) options(op.fmrip[toset])
+  invisible(NULL)
 }
