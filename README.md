@@ -54,6 +54,11 @@ summary(fit)
 params <- coef(fit)  # Returns tau, sigma, rho for each voxel
 ```
 
+## Documentation
+
+Full function reference and articles are available at
+<https://bbuchsbaum.github.io/fmriparametry>.
+
 ## HRF Models
 
 ### Lag-Width-Undershoot (LWU) Model
