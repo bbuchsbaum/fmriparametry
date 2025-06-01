@@ -243,7 +243,8 @@
   # Derivatives (vectorized operations)
   dh_dtau <- h_base * z / sigma0
   dh_dsigma <- h_base * z_squared / sigma0
-  dh_drho <- rep(0, length(t))  # Simplified for LWU main component
+  z_u <- (t - tau0 - 2 * sigma0) / (1.6 * sigma0)
+  dh_drho <- -exp(-0.5 * z_u * z_u)
   
   # Linear combination (SIMD-optimized)
   h_taylor <- h_base + dtau * dh_dtau + dsigma * dh_dsigma + drho * dh_drho

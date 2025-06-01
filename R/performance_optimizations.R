@@ -161,7 +161,8 @@
   # Derivatives (compiler can vectorize)
   dh_dt1 <- h0 * z1 / theta0[2]
   dh_dt2 <- h0 * z1 * z1 / theta0[2]
-  dh_dt3 <- numeric(n)  # Placeholder
+  z_u <- (t - theta0[1] - 2 * theta0[2]) / (1.6 * theta0[2])
+  dh_dt3 <- -exp(-0.5 * z_u * z_u)
   
   # Linear combination (SIMD-friendly)
   h <- h0 + dt1 * dh_dt1 + dt2 * dh_dt2 + dt3 * dh_dt3
