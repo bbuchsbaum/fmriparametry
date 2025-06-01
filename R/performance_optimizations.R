@@ -182,13 +182,17 @@
   })["elapsed"]
   
   time_parallel <- system.time({
-    .parametric_engine_parallel(Y[, sample_idx], X, n_cores = 2)
-  })["elapsed"] 
+    pc <- .setup_parallel_backend(n_cores = 2, verbose = FALSE)
+    on.exit(pc$cleanup(), add = TRUE)
+    .parametric_engine_parallel(Y[, sample_idx], X, parallel_config = pc)
+  })["elapsed"]
   
   # Choose best method
   if (time_parallel < 0.8 * time_direct) {
     cores <- min(parallel::detectCores() - 1, ceiling(n_vox / 100))
-    return(.parametric_engine_parallel(Y, X, n_cores = cores))
+    pc <- .setup_parallel_backend(n_cores = cores, verbose = FALSE)
+    on.exit(pc$cleanup(), add = TRUE)
+    return(.parametric_engine_parallel(Y, X, parallel_config = pc))
   } else {
     return(.parametric_engine_direct(Y, X))
   }
