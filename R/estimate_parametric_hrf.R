@@ -713,36 +713,39 @@ estimate_parametric_hrf <- function(
   se_beta0 <- numeric(n_vox)
   
   # Compute for each voxel (vectorized where possible)
-  for (v in 1:n_vox) {
+  for (v in seq_len(n_vox)) {
     tryCatch({
       # Current parameter estimates
       theta_v <- theta_hat[v, ]
       
-      # Compute numerical derivatives of HRF w.r.t. parameters
-      eps <- 1e-6
-      basis_derivs <- matrix(0, length(hrf_eval_times), n_params)
-      
-      for (p in 1:n_params) {
-        theta_plus <- theta_minus <- theta_v
-        theta_plus[p] <- theta_v[p] + eps
-        theta_minus[p] <- theta_v[p] - eps
-        
-        h_plus <- hrf_interface$hrf_function(hrf_eval_times, theta_plus)
-        h_minus <- hrf_interface$hrf_function(hrf_eval_times, theta_minus)
-        
-        basis_derivs[, p] <- (h_plus - h_minus) / (2 * eps)
+      # Get analytical derivatives from Taylor basis
+      taylor_basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
+      if (!is.matrix(taylor_basis)) {
+        taylor_basis <- matrix(taylor_basis, ncol = n_params + 1)
       }
-      
-      # Convolve derivatives with stimulus
+      basis_derivs <- taylor_basis[, -1, drop = FALSE]
+
+      # Convolve derivatives with stimulus (sum across regressors)
       X_derivs <- matrix(0, n_time, n_params)
-      for (p in 1:n_params) {
-        conv_result <- convolve(S_target_proj[, 1], rev(basis_derivs[, p]), type = "open")
-        X_derivs[, p] <- conv_result[1:n_time]
+      for (p in seq_len(n_params)) {
+        design_col <- numeric(n_time)
+        for (j in seq_len(ncol(S_target_proj))) {
+          conv_full <- stats::convolve(S_target_proj[, j], rev(basis_derivs[, p]), type = "open")
+          design_col <- design_col + conv_full[seq_len(n_time)]
+        }
+        X_derivs[, p] <- beta0[v] * design_col
+      }
+
+      # Predicted HRF for amplitude SE computation
+      hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
+      x_hrf <- numeric(n_time)
+      for (j in seq_len(ncol(S_target_proj))) {
+        conv_full <- stats::convolve(S_target_proj[, j], rev(hrf_vals), type = "open")
+        x_hrf <- x_hrf + conv_full[seq_len(n_time)]
       }
       
       # Residual variance
-      y_pred <- S_target_proj %*% beta0[v]
-      residuals <- Y_proj[, v] - y_pred
+      residuals <- Y_proj[, v] - beta0[v] * x_hrf
       sigma2 <- sum(residuals^2) / (n_time - 1)
       
       # Fisher Information Matrix (approximate)
@@ -759,8 +762,8 @@ estimate_parametric_hrf <- function(
       
       se_theta_hat[v, ] <- sqrt(pmax(0, diag(fisher_inv)))
       
-      # Standard error for beta0 (simpler)
-      se_beta0[v] <- sqrt(sigma2 / sum(S_target_proj[, 1]^2))
+      # Standard error for beta0 using design for current HRF
+      se_beta0[v] <- sqrt(sigma2 / sum(x_hrf^2))
       
     }, error = function(e) {
       # Fallback: use rough estimates
