@@ -3,3 +3,15 @@
 .Rproj.user/
 .DS_Store
 
+# Build artifacts
+*.tar.gz
+*-output.txt
+*-output.xml
+test_output.txt
+test_results.txt
+
+# Local demo/quick test scripts
+debug_test.R
+quick_test.R
+run_engineering_demo.R
+

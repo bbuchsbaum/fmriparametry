@@ -187,7 +187,10 @@
 #' @param kernel_length Length of each kernel
 #' @param is_iterative Is this part of an iterative algorithm?
 #' @param verbose Print performance decisions?
-#' @return Comprehensive performance configuration
+#' @return Comprehensive performance configuration. The returned list
+#'   includes the smart decision objects, a human-readable strategy
+#'   summary, and a `functions` element referencing the smart
+#'   implementations.
 .master_performance_dispatcher <- function(n_voxels, n_timepoints, n_kernels = 4, 
                                           kernel_length = 61, is_iterative = FALSE,
                                           verbose = TRUE) {
@@ -253,8 +256,8 @@
     functions = list(
       convolution = .smart_convolution,
       qr_solve = .smart_qr_solve,
-      parallel_decision = parallel_decision,
-      memory_decision = memory_decision
+      parallel_decision = .smart_parallel_decision,
+      memory_decision = .smart_memory_decision
     )
   ))
 }

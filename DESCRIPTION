@@ -27,6 +27,7 @@ Imports:
     RcppEigen,
     Rcpp,
     RcppParallel,
+    digest,
     methods,
     stats
 LinkingTo:
