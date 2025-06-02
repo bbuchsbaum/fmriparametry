@@ -103,19 +103,16 @@
   n_vox <- ncol(Y_proj)
   n_params <- length(theta_seed)
   
-  # Level 1: Try full iterative estimation
+  # Level 1: Try estimation with global refinement
   result <- .try_with_recovery(
     primary_fn = function() {
-      .parametric_engine_iterative(
-        Y_proj = Y_proj,
-        S_target_proj = S_target_proj,
-        scan_times = seq_len(nrow(Y_proj)),
-        hrf_eval_times = seq(0, 30, by = 0.5),
-        hrf_interface = hrf_interface,
+      estimate_parametric_hrf(
+        fmri_data = Y_proj,
+        event_model = S_target_proj,
         theta_seed = theta_seed,
         theta_bounds = theta_bounds,
-        recenter_global_passes = recenter_global_passes,
-        compute_residuals = TRUE,
+        global_refinement = TRUE,
+        global_passes = recenter_global_passes,
         compute_se = TRUE,
         verbose = verbose
       )

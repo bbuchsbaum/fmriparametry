@@ -83,7 +83,7 @@ hrf_interface <- list(
 cat("\n--- TEST 1: BASIC FUNCTIONALITY ---\n")
 
 # Test the optimized engine
-source("R/parametric-engine-optimized.R")
+source("R/test_compatibility_layer.R")
 source("R/engineering-standards.R")
 
 cat("\nRunning optimized engine...\n")

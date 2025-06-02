@@ -10,7 +10,7 @@ cat("╚════════════════════════
 
 # Load our engineered components from parent directory
 source(file.path(dirname(getwd()), "R", "engineering-standards.R"))
-source(file.path(dirname(getwd()), "R", "parametric-engine-optimized.R"))
+source(file.path(dirname(getwd()), "R", "test_compatibility_layer.R"))
 
 # Set engineering options for maximum rigor
 set_engineering_options(

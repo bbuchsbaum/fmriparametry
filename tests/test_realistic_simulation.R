@@ -7,6 +7,7 @@ source("R/parametric-engine.R")
 source("R/hrf-interface-lwu.R")
 source("R/prepare-parametric-inputs.R")
 source("R/parametric-hrf-fit-class.R")
+source("R/test_compatibility_layer.R")
 
 # Create realistic synthetic data with known LWU parameters
 create_realistic_data <- function(n_time = 200, n_vox = 100, n_clusters = 3, snr = 2) {
@@ -154,7 +155,6 @@ for (i in seq_along(snr_levels)) {
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
     theta_bounds = list(lower = c(2, 1, 0), upper = c(12, 5, 1))
-    )
   )
   
   r2_by_snr[i] <- mean(fit_snr$r_squared)
@@ -206,10 +206,8 @@ tryCatch({
 
 # Test 5: Iterative refinement
 cat("\n\n=== TEST 5: Iterative Refinement ===\n")
-if (file.exists("R/parametric-engine-iterative.R")) {
-  source("R/parametric-engine-iterative.R")
-  
-  data_iter <- create_realistic_data(n_time = 150, n_vox = 50, snr = 2)
+
+data_iter <- create_realistic_data(n_time = 150, n_vox = 50, snr = 2)
   
   # Single pass
   fit_single <- .parametric_engine(
@@ -233,10 +231,9 @@ if (file.exists("R/parametric-engine-iterative.R")) {
       hrf_eval_times = data_iter$t_hrf,
       hrf_interface = hrf_interface,
       theta_seed = c(6, 2.5, 0.35),
-      theta_bounds = list(lower = c(2, 1, 0), upper = c(12, 5, 1))
+      theta_bounds = list(lower = c(2, 1, 0), upper = c(12, 5, 1)),
       recenter_global_passes = 3,
-      compute_se = TRUE,
-      )
+      compute_se = TRUE
     )
     
     cat("Single pass mean R²:", round(mean(fit_single$r_squared), 3), "\n")
@@ -251,7 +248,6 @@ if (file.exists("R/parametric-engine-iterative.R")) {
   }, error = function(e) {
     cat("ERROR in iterative:", e$message, "\n")
   })
-}
 
 # Summary
 cat("\n\n=== SUMMARY ===\n")
