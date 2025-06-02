@@ -54,6 +54,18 @@ summary(fit)
 params <- coef(fit)  # Returns tau, sigma, rho for each voxel
 ```
 
+### Single-Voxel Sanity Check
+
+For quick verification that the estimation machinery is functioning, the
+package exposes `single_voxel_sanity_check()`. It fits a single time series
+against a one-condition design.
+
+```r
+y <- rnorm(40)
+onsets <- rep(0, 40); onsets[c(10, 30)] <- 1
+res <- single_voxel_sanity_check(y, onsets)
+```
+
 ## Documentation
 
 Full function reference and articles are available at
