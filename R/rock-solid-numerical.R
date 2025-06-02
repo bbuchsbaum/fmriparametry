@@ -3,44 +3,6 @@
 #' Numerical safety functions that prevent ALL numerical failures.
 #' Every operation is protected against overflow, underflow, and ill-conditioning.
 
-#' Safe division that never produces NaN or Inf
-#' @keywords internal
-.safe_divide <- function(numerator, denominator, epsilon = .Machine$double.eps) {
-  # Detect problematic cases
-  inf_num <- is.infinite(numerator)
-  inf_denom <- is.infinite(denominator)
-  zero_denom <- abs(denominator) < epsilon
-  
-  # Handle Inf/Inf cases with warning
-  inf_inf_case <- inf_num & inf_denom
-  if (any(inf_inf_case)) {
-    warning("Division produced potential non-finite values: Inf/Inf cases detected")
-  }
-  
-  # Ensure denominator is never exactly zero
-  safe_denom <- ifelse(zero_denom, 
-                       sign(denominator) * epsilon,
-                       denominator)
-  
-  # Compute division
-  result <- numerator / safe_denom
-  
-  # Handle special cases
-  result <- ifelse(inf_inf_case, 0, result)  # Inf/Inf -> 0
-  result <- ifelse(abs(numerator) < epsilon & zero_denom, 0, result)  # 0/0 -> 0
-  
-  # Check for any remaining non-finite values
-  if (any(!is.finite(result))) {
-    warning("Division produced non-finite values, replacing with zeros")
-    result[!is.finite(result)] <- 0
-  }
-  
-  # Clip extreme values
-  max_val <- sqrt(.Machine$double.xmax)
-  result <- pmax(-max_val, pmin(result, max_val))
-  
-  result
-}
 
 #' Check and improve matrix conditioning
 #' @keywords internal
