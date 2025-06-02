@@ -33,6 +33,10 @@
   # Enforce LWU parameter bounds to prevent fmrireg errors
   bounds <- .lwu_hrf_default_bounds()
   params_vector0 <- pmax(bounds$lower, pmin(params_vector0, bounds$upper))
+  # Avoid exact boundary values which can break numerical derivatives
+  eps <- 1e-6
+  params_vector0 <- pmax(bounds$lower + eps,
+                         pmin(params_vector0, bounds$upper - eps))
   
   basis <- fmrireg::hrf_basis_lwu(theta0 = params_vector0,
                                   t = t_hrf_eval,

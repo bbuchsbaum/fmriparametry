@@ -276,6 +276,10 @@ estimate_parametric_hrf <- function(
       # Ensure theta_center is within bounds before using as seed
       if (!is.null(theta_bounds)) {
         theta_center <- pmax(theta_bounds$lower, pmin(theta_center, theta_bounds$upper))
+        # Stay slightly inside bounds to avoid issues in derivative calculations
+        eps <- 1e-6
+        theta_center <- pmax(theta_bounds$lower + eps,
+                             pmin(theta_center, theta_bounds$upper - eps))
       }
       
       # Re-run engine with new center
