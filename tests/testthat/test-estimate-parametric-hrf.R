@@ -34,7 +34,7 @@ test_that("estimate_parametric_hrf validates inputs correctly", {
   # Test invalid HRF model
   expect_error(
     estimate_parametric_hrf(fmri_data, event_design, parametric_hrf = "invalid"),
-    "Unsupported HRF model"
+    "HRF model 'invalid' is not registered"
   )
   
   # Test invalid theta_seed length
