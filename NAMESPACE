@@ -6,6 +6,7 @@ importFrom(RcppEigen, fastLm)
 importFrom(stats, rnorm)
 importFrom(stats, rbinom)
 importFrom(Matrix, Matrix)
+importFrom(digest, digest)
 
 # Main exported function
 export(estimate_parametric_hrf)
