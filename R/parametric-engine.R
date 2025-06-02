@@ -60,7 +60,12 @@
 
   # 4. Extract amplitude and parameter updates
   beta0 <- coeffs[1, ]
-  beta0_safe <- ifelse(abs(beta0) < 1e-6, sign(beta0) * 1e-6, beta0)
+  # Avoid division by zero when beta0 is extremely small
+  beta0_safe <- ifelse(
+    abs(beta0) < 1e-6,
+    ifelse(beta0 < 0, -1e-6, 1e-6),
+    beta0
+  )
   delta_theta <- coeffs[2:(n_params + 1), , drop = FALSE] /
     matrix(rep(beta0_safe, each = n_params), nrow = n_params)
 
