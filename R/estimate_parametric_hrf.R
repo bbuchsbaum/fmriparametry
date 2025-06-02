@@ -239,7 +239,7 @@ estimate_parametric_hrf <- function(
   amplitudes <- core_result$beta0
   
   # Ensure theta_current is always a matrix
-  if (!is.matrix(theta_current)) {
+  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
     theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
     colnames(theta_current) <- hrf_interface$parameter_names
   }
@@ -276,7 +276,7 @@ estimate_parametric_hrf <- function(
       r_squared_prev <- r_squared
       
       # Re-center globally with bounds enforcement
-      if (!is.matrix(theta_current) || is.null(dim(theta_current))) {
+      if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
         theta_current <- matrix(
           theta_current,
           nrow = n_vox,
@@ -327,7 +327,7 @@ estimate_parametric_hrf <- function(
       amplitudes <- iter_result$beta0
       
       # Ensure theta_current is always a matrix (critical for apply() calls)
-      if (!is.matrix(theta_current) || is.null(dim(theta_current))) {
+      if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
         theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
         colnames(theta_current) <- hrf_interface$parameter_names
       }
@@ -580,7 +580,7 @@ estimate_parametric_hrf <- function(
   }
 
   # Ensure theta_current is a proper matrix
-  if (!is.matrix(theta_current)) {
+  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
     theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
   }
   
@@ -590,7 +590,7 @@ estimate_parametric_hrf <- function(
   }
   
   # Ensure theta_current is still a matrix before creating fit object
-  if (!is.matrix(theta_current)) {
+  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
     theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
     colnames(theta_current) <- hrf_interface$parameter_names
   }
@@ -669,12 +669,18 @@ estimate_parametric_hrf <- function(
 }
 
 # MISSING FUNCTION 2: Standard errors via Delta method
-.compute_standard_errors_delta <- function(theta_hat, beta0, Y_proj, S_target_proj, 
+.compute_standard_errors_delta <- function(theta_hat, beta0, Y_proj, S_target_proj,
                                           hrf_interface, hrf_eval_times) {
-  
   n_vox <- ncol(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
   n_time <- nrow(Y_proj)
+
+  # Ensure theta_hat is a matrix
+  if (!is.matrix(theta_hat) || length(dim(theta_hat)) != 2) {
+    theta_hat <- matrix(theta_hat, nrow = n_vox, ncol = n_params,
+                        byrow = FALSE)
+    colnames(theta_hat) <- hrf_interface$parameter_names
+  }
   
   # Pre-allocate results
   se_theta_hat <- matrix(NA_real_, n_vox, n_params)
