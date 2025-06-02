@@ -90,9 +90,10 @@ new_parametric_hrf_fit <- function(
     convergence_info = convergence_info,
     metadata = metadata
   )
-  
+
   # For backward compatibility, also include old fields
-  obj$convergence <- convergence_info  # Alias for backward compatibility
+  obj$parameters <- obj$estimated_parameters
+  obj$convergence <- convergence_info
   
   class(obj) <- "parametric_hrf_fit"
   obj
@@ -121,4 +122,18 @@ get_fitted_values <- function(x, Y_proj = NULL) {
   } else {
     stop("Cannot compute fitted values without residuals or design matrix")
   }
+}
+
+#' Number of voxels in a fit object
+#' @param x parametric_hrf_fit
+#' @keywords internal
+n_voxels <- function(x) {
+  x$metadata$n_voxels
+}
+
+#' Number of time points used during fitting
+#' @param x parametric_hrf_fit
+#' @keywords internal
+n_timepoints <- function(x) {
+  x$metadata$n_timepoints
 }

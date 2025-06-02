@@ -11,7 +11,7 @@ cat("╚════════════════════════
 # Load core implementations
 source("R/parametric-engine.R")
 source("R/prepare-parametric-inputs.R")
-source("R/parametric-hrf-fit-class.R")
+source("R/parametric-hrf-fit-class-v2.R")
 
 cat("┌─────────────────────────────────────────────────────────────────────┐\n")
 cat("│ DEMONSTRATION 1: Core Algorithm Performance                         │\n")
@@ -205,8 +205,8 @@ cat(sprintf("\n  Vignettes:              %d\n", length(vignette_files)))
 cat("\nMajor Components:\n")
 components <- c(
   "Core Engine" = "parametric-engine.R",
-  "Data Preparation" = "prepare-parametric-inputs.R", 
-  "S3 Classes" = "parametric-hrf-fit-class.R",
+  "Data Preparation" = "prepare-parametric-inputs.R",
+  "S3 Classes" = "parametric-hrf-fit-class-v2.R",
   "S3 Methods" = "parametric-hrf-fit-methods.R",
   "Main Interface" = "estimate_parametric_hrf.R"
 )
