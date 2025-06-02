@@ -68,10 +68,16 @@ test_that("estimate_parametric_hrf returns expected structure", {
     verbose = FALSE
   )
   
-  # Check structure
-  expect_named(result, c("estimated_parameters", "amplitudes", "standard_errors",
-                        "fit_quality", "convergence_info", "refinement_info", 
-                        "metadata"))
+  # Check structure - current fit object contains a richer set of fields
+  expect_named(
+    result,
+    c(
+      "estimated_parameters", "amplitudes", "parameter_names", "hrf_model",
+      "r_squared", "residuals", "parameter_ses", "convergence_info",
+      "metadata", "parameters", "convergence", "standard_errors",
+      "se_amplitudes", "fit_quality", "refinement_info"
+    )
+  )
   
   # Check dimensions
   expect_equal(nrow(result$estimated_parameters), ncol(fmri_data))
