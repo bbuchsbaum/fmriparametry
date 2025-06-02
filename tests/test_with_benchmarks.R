@@ -6,7 +6,7 @@ library(testthat)
 source("R/parametric-engine.R")
 source("R/hrf-interface-lwu.R")
 source("R/prepare-parametric-inputs.R")
-source("R/parametric-hrf-fit-class-v2.R")
+source("R/parametric-hrf-fit-class.R")
 source("R/estimate_parametric_hrf.R")
 
 # List available benchmarks

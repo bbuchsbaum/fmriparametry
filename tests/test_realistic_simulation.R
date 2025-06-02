@@ -6,7 +6,7 @@ cat("Loading fmriparametric functions...\n")
 source("R/parametric-engine.R")
 source("R/hrf-interface-lwu.R")
 source("R/prepare-parametric-inputs.R")
-source("R/parametric-hrf-fit-class-v2.R")
+source("R/parametric-hrf-fit-class.R")
 
 # Create realistic synthetic data with known LWU parameters
 create_realistic_data <- function(n_time = 200, n_vox = 100, n_clusters = 3, snr = 2) {
