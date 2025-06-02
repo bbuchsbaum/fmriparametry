@@ -155,6 +155,14 @@ estimate_parametric_hrf <- function(
       S = inputs$S_target_proj,
       hrf_interface = hrf_interface
     )
+  } else {
+    if (!is.numeric(theta_seed)) {
+      stop("theta_seed must be numeric", call. = FALSE)
+    }
+    expected_len <- length(hrf_interface$parameter_names)
+    if (length(theta_seed) != expected_len) {
+      stop(sprintf("theta_seed must have length %d", expected_len), call. = FALSE)
+    }
   }
   
   # Handle theta_bounds
