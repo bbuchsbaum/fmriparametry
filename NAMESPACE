@@ -10,6 +10,8 @@ importFrom(digest, digest)
 
 # Main exported function
 export(estimate_parametric_hrf)
+export(register_hrf_model)
+export(get_timing_report)
 
 # S3 methods for parametric_hrf_fit
 S3method(print, parametric_hrf_fit)
