@@ -276,6 +276,15 @@ estimate_parametric_hrf <- function(
       r_squared_prev <- r_squared
       
       # Re-center globally with bounds enforcement
+      if (!is.matrix(theta_current) || is.null(dim(theta_current))) {
+        theta_current <- matrix(
+          theta_current,
+          nrow = n_vox,
+          ncol = length(hrf_interface$parameter_names)
+        )
+        colnames(theta_current) <- hrf_interface$parameter_names
+      }
+
       theta_center <- apply(theta_current, 2, median)
       
       # Ensure theta_center is within bounds before using as seed
