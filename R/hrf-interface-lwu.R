@@ -34,9 +34,13 @@
   bounds <- .lwu_hrf_default_bounds()
   params_vector0 <- pmax(bounds$lower, pmin(params_vector0, bounds$upper))
   # Avoid exact boundary values which can break numerical derivatives
-  eps <- 1e-6
+  # Use larger epsilon for rho since numDeriv uses larger step sizes
+  eps <- c(0.01, 0.01, 0.01)  # Ensure enough space for numerical derivatives
   params_vector0 <- pmax(bounds$lower + eps,
                          pmin(params_vector0, bounds$upper - eps))
+  
+  # Ensure params_vector0 has names for fmrireg
+  names(params_vector0) <- c("tau", "sigma", "rho")
   
   basis <- fmrireg::hrf_basis_lwu(theta0 = params_vector0,
                                   t = t_hrf_eval,

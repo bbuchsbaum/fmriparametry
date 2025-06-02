@@ -162,6 +162,11 @@ estimate_parametric_hrf <- function(
     theta_bounds <- hrf_interface$default_bounds()
   }
   
+  # Ensure theta_seed is within safe bounds for numerical derivatives
+  eps <- c(0.01, 0.01, 0.01)
+  theta_seed <- pmax(theta_bounds$lower + eps,
+                     pmin(theta_seed, theta_bounds$upper - eps))
+  
   # Set initial values
   for (j in seq_len(ncol(theta_current))) {
     theta_current[, j] <- theta_seed[j]
