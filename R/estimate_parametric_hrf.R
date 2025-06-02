@@ -102,6 +102,13 @@ estimate_parametric_hrf <- function(
   # Match arguments
   tiered_refinement <- match.arg(tiered_refinement)
   safety_mode <- match.arg(safety_mode)
+
+  if (!is.logical(verbose) || length(verbose) != 1) {
+    stop("verbose must be logical TRUE/FALSE", call. = FALSE)
+  }
+  if (!is.logical(progress) || length(progress) != 1) {
+    stop("progress must be logical TRUE/FALSE", call. = FALSE)
+  }
   
   # Initialize progress tracking if requested
   if (progress && verbose) {
@@ -168,6 +175,21 @@ estimate_parametric_hrf <- function(
   # Handle theta_bounds
   if (is.null(theta_bounds)) {
     theta_bounds <- hrf_interface$default_bounds()
+  } else {
+    if (!is.list(theta_bounds) ||
+        !all(c("lower", "upper") %in% names(theta_bounds))) {
+      stop("theta_bounds must have both 'lower' and 'upper' components",
+           call. = FALSE)
+    }
+    expected_len <- length(hrf_interface$parameter_names)
+    if (length(theta_bounds$lower) != expected_len ||
+        length(theta_bounds$upper) != expected_len) {
+      stop(sprintf("theta_bounds components must have length %d",
+                   expected_len), call. = FALSE)
+    }
+    if (!is.numeric(theta_bounds$lower) || !is.numeric(theta_bounds$upper)) {
+      stop("theta_bounds values must be numeric", call. = FALSE)
+    }
   }
   
   # Ensure theta_seed is within safe bounds for numerical derivatives
