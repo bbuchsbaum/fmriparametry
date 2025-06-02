@@ -48,6 +48,12 @@
 
   # 2. Convolve stimulus with basis functions
   X_design <- .batch_convolution(S_target_proj, X_basis, n_time)
+  
+  # Ensure X_design is a matrix
+  if (!is.matrix(X_design)) {
+    stop(sprintf("X_design is not a matrix after batch convolution. Class: %s, is.null: %s", 
+                 paste(class(X_design), collapse=","), is.null(X_design)))
+  }
 
   # 3. Linear solution with ridge regularisation
   coeffs <- .ridge_linear_solve(X_design, Y_proj, lambda_ridge)
