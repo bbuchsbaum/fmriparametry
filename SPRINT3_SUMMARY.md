@@ -7,7 +7,7 @@ Sprint 3 has been successfully completed, transforming `fmriparametric` into a p
 ## Major Accomplishments
 
 ### 1. K-means Spatial Clustering (SP3-301, SP3-302)
-- **Implemented**: `kmeans-recentering.R` with full K-means clustering algorithm
+- **Implemented**: `kmeans-recentering.R` (deprecated) providing K-means clustering functionality
 - **Features**:
   - Identifies spatial clusters with distinct HRF characteristics
   - Uses cluster centers as expansion points for refinement
@@ -75,7 +75,7 @@ Sprint 3 has been successfully completed, transforming `fmriparametric` into a p
 ## Files Created/Modified
 
 ### New R Files
-1. `R/kmeans-recentering.R`
+1. `R/kmeans-recentering.R` (deprecated)
 2. `R/refinement-queue.R`
 3. `R/gauss-newton-refinement.R`
 4. `R/parallel-processing.R`
