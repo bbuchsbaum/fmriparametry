@@ -1,0 +1,262 @@
+
+R version 4.3.2 (2023-10-31) -- "Eye Holes"
+Copyright (C) 2023 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(fmriparametric); library(testthat); test_local()
+Warning message:
+package ‘testthat’ was built under R version 4.3.3 
+Registered S3 method overwritten by 'future':
+  method               from      
+  all.equal.connection parallelly
+✔ | F W  S  OK | Context
+
+⠏ |          0 | batch-convolution-wrapper                                      
+✔ |   1      0 | batch-convolution-wrapper
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-batch-convolution-wrapper.R:4:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("batch convolution helper") at test-batch-convolution-wrapper.R:4:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | batch convolution helper                                       
+✖ | 1        0 | batch convolution helper
+────────────────────────────────────────────────────────────────────────────────
+Failure ('test-batch-convolution-wrapper.R:16:3'): batch convolution sums across signals
+`result` (`actual`) not equal to `manual` (`expected`).
+
+`actual` is NULL
+`expected` is a double vector (-1.28929796939538, -1.14078673890984, -1.41662923812447, -1.28929796939538, -1.14078673890984, ...)
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | engineering-standards                                          
+✔ |   1      0 | engineering-standards
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-engineering-standards.R:7:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Numerical Robustness") at test-engineering-standards.R:7:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Numerical Robustness                    
+✖ | 5 4     15 | Engineering Standards: Numerical Robustness
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-engineering-standards.R:21:3'): Safe division handles all edge cases correctly
+Near-zero denominator detected, applying epsilon correction
+Backtrace:
+    ▆
+ 1. └─fmriparametric:::.safe_divide(1, tiny) at test-engineering-standards.R:21:3
+
+Failure ('test-engineering-standards.R:25:3'): Safe division handles all edge cases correctly
+`result <- .safe_divide(c(Inf, -Inf), c(Inf, -Inf))` did not throw the expected warning.
+
+Failure ('test-engineering-standards.R:29:3'): Safe division handles all edge cases correctly
+`result` (`actual`) not equal to c(0, 0) (`expected`).
+
+  `actual`: NaN NaN
+`expected`: 0.0 0.0
+
+Failure ('test-engineering-standards.R:66:5'): Safe matrix inversion handles ill-conditioned matrices
+error < sqrt(kappa) * .Machine$double.eps * 1e+05 is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+Warning ('test-engineering-standards.R:57:7'): Safe matrix inversion handles ill-conditioned matrices
+Matrix is poorly conditioned (kappa = 3.89e+10)
+Backtrace:
+    ▆
+ 1. └─fmriparametric:::.safe_solve(A) at test-engineering-standards.R:57:7
+
+Failure ('test-engineering-standards.R:66:5'): Safe matrix inversion handles ill-conditioned matrices
+error < sqrt(kappa) * .Machine$double.eps * 1e+05 is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+Warning ('test-engineering-standards.R:52:7'): Safe matrix inversion handles ill-conditioned matrices
+Matrix is rank-deficient, using pseudo-inverse
+Backtrace:
+    ▆
+ 1. ├─testthat::expect_warning(A_inv <- .safe_solve(A), "poorly conditioned") at test-engineering-standards.R:52:7
+ 2. │ └─testthat:::expect_condition_matching(...)
+ 3. │   └─testthat:::quasi_capture(...)
+ 4. │     ├─testthat (local) .capture(...)
+ 5. │     │ └─base::withCallingHandlers(...)
+ 6. │     └─rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+ 7. └─fmriparametric:::.safe_solve(A)
+
+Failure ('test-engineering-standards.R:66:5'): Safe matrix inversion handles ill-conditioned matrices
+error < sqrt(kappa) * .Machine$double.eps * 1e+05 is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+Warning ('test-engineering-standards.R:94:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Input Validation") at test-engineering-standards.R:94:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Input Validation                        
+✔ |   1      7 | Engineering Standards: Input Validation
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-engineering-standards.R:144:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Performance Utilities") at test-engineering-standards.R:144:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Performance Utilities                   Consider:
+  - Using smaller chunks
+  - Increasing memory limit: memory.limit(size = ...)
+  - Closing other applications
+
+✖ | 1 3     10 | Engineering Standards: Performance Utilities
+────────────────────────────────────────────────────────────────────────────────
+Failure ('test-engineering-standards.R:164:3'): Timing utilities work correctly
+"test_operation" %in% report$operation is not TRUE
+
+`actual`:   FALSE
+`expected`: TRUE 
+
+Warning ('test-engineering-standards.R:193:3'): Repeated helper calls return consistent results
+Error in fallback:
+  boom
+  Call stack: pairlist(test_local(), test_dir(test_path, package = package,  >     reporter = reporter, ..., load_package = load_package), test_files(test_dir = path,  >     test_paths = test_paths, test_package = package, reporter = reporter,  >     load_helpers = load_helpers, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, load_package = load_package,  >     parallel = parallel), test_files_serial(test_dir = test_dir,  >     test_package = test_package, test_paths = test_paths, load_helpers = load_helpers,  >     reporter = reporter, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, desc = desc, load_package = load_package,  >     error_call = error_call), with_reporter(reporters$multi,  >     lapply(test_paths, test_one_file, env = env, desc = desc,  >         error_call = error_call)), tryCatch(code, testthat_abort_reporter = function(cnd) { >     cat(conditionMessage(cnd), "\n") >     NULL > }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), lapply(test_paths, test_one_file,  >     env = env, desc = desc, error_call = error_call), FUN(X[[i]],  >     ...), source_file(path, env = env(env), desc = desc, error_call = error_call), test_code(test = NULL,  >     code = exprs, env = env, reporter = get_reporter() %||% StopReporter$new()), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), test_that("Repeated helper calls return consistent results",  >     { >         expect_identical(.try_with_context({ >             1 + 1 >         }, context = "idempotent"), .try_with_context({ >             1 + 1 >         }, context = "idempotent")) >         expect_identical(.try_with_context(stop("boom"), context = "fallback",  >             fallback = 42), .try_with_context(stop("boom"), context = "fallback",  >             fallback = 42)) >         expect_identical(.check_memory_available(1e+06, "repeat"),  >             .check_memory_available(1e+06, "repeat")) >     }), test_code(desc, code, env = parent.frame(), reporter = reporter), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), expect_identical(.try_with_context(stop("boom"),  >     context = "fallback", fallback = 42), .try_with_context(stop("boom"),  >     context = "fallback", fallback = 42)), quasi_label(enquo(object),  >     label, arg = "object"), eval_bare(expr, quo_get_env(quo)), .try_with_context(stop("boom"),  >     context = "fallback", fallback = 42), .fmriparametric_internal$try_with_context(...), tryCatch(expr,  >     error = function(e) { >         enhanced_msg <- sprintf("Error in %s:\n  %s\n  Call stack: %s",  >             context, e$message, paste(deparse(sys.calls()), collapse = " > ")) >         if (!is.null(fallback)) { >             warning(enhanced_msg, "\n  Attempting fallback...") >             tryCatch(fallback, error = function(e2) { >                 stop(sprintf("%s\n  Fallback also failed: %s",  >                   enhanced_msg, e2$message), call. = FALSE) >             }) >         } else { >             stop(enhanced_msg, call. = FALSE) >         } >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), value[[3L]](cond))
+  Attempting fallback...
+Backtrace:
+    ▆
+ 1. ├─testthat::expect_identical(...) at test-engineering-standards.R:193:3
+ 2. │ └─testthat::quasi_label(enquo(object), label, arg = "object")
+ 3. │   └─rlang::eval_bare(expr, quo_get_env(quo))
+ 4. └─fmriparametric:::.try_with_context(...)
+ 5.   └─.fmriparametric_internal$try_with_context(...) at fmriparametry/R/internal-utils.R:94:22
+ 6.     └─base::tryCatch(...) at fmriparametry/R/internal-utils.R:9:3
+ 7.       └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 8.         └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 9.           └─value[[3L]](cond)
+
+Warning ('test-engineering-standards.R:193:3'): Repeated helper calls return consistent results
+Error in fallback:
+  boom
+  Call stack: pairlist(test_local(), test_dir(test_path, package = package,  >     reporter = reporter, ..., load_package = load_package), test_files(test_dir = path,  >     test_paths = test_paths, test_package = package, reporter = reporter,  >     load_helpers = load_helpers, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, load_package = load_package,  >     parallel = parallel), test_files_serial(test_dir = test_dir,  >     test_package = test_package, test_paths = test_paths, load_helpers = load_helpers,  >     reporter = reporter, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, desc = desc, load_package = load_package,  >     error_call = error_call), with_reporter(reporters$multi,  >     lapply(test_paths, test_one_file, env = env, desc = desc,  >         error_call = error_call)), tryCatch(code, testthat_abort_reporter = function(cnd) { >     cat(conditionMessage(cnd), "\n") >     NULL > }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), lapply(test_paths, test_one_file,  >     env = env, desc = desc, error_call = error_call), FUN(X[[i]],  >     ...), source_file(path, env = env(env), desc = desc, error_call = error_call), test_code(test = NULL,  >     code = exprs, env = env, reporter = get_reporter() %||% StopReporter$new()), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), test_that("Repeated helper calls return consistent results",  >     { >         expect_identical(.try_with_context({ >             1 + 1 >         }, context = "idempotent"), .try_with_context({ >             1 + 1 >         }, context = "idempotent")) >         expect_identical(.try_with_context(stop("boom"), context = "fallback",  >             fallback = 42), .try_with_context(stop("boom"), context = "fallback",  >             fallback = 42)) >         expect_identical(.check_memory_available(1e+06, "repeat"),  >             .check_memory_available(1e+06, "repeat")) >     }), test_code(desc, code, env = parent.frame(), reporter = reporter), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), expect_identical(.try_with_context(stop("boom"),  >     context = "fallback", fallback = 42), .try_with_context(stop("boom"),  >     context = "fallback", fallback = 42)), quasi_label(enquo(expected),  >     expected.label, arg = "expected"), eval_bare(expr, quo_get_env(quo)), .try_with_context(stop("boom"),  >     context = "fallback", fallback = 42), .fmriparametric_internal$try_with_context(...), tryCatch(expr,  >     error = function(e) { >         enhanced_msg <- sprintf("Error in %s:\n  %s\n  Call stack: %s",  >             context, e$message, paste(deparse(sys.calls()), collapse = " > ")) >         if (!is.null(fallback)) { >             warning(enhanced_msg, "\n  Attempting fallback...") >             tryCatch(fallback, error = function(e2) { >                 stop(sprintf("%s\n  Fallback also failed: %s",  >                   enhanced_msg, e2$message), call. = FALSE) >             }) >         } else { >             stop(enhanced_msg, call. = FALSE) >         } >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), value[[3L]](cond))
+  Attempting fallback...
+Backtrace:
+    ▆
+ 1. ├─testthat::expect_identical(...) at test-engineering-standards.R:193:3
+ 2. │ └─testthat::quasi_label(enquo(expected), expected.label, arg = "expected")
+ 3. │   └─rlang::eval_bare(expr, quo_get_env(quo))
+ 4. └─fmriparametric:::.try_with_context(...)
+ 5.   └─.fmriparametric_internal$try_with_context(...) at fmriparametry/R/internal-utils.R:94:22
+ 6.     └─base::tryCatch(...) at fmriparametry/R/internal-utils.R:9:3
+ 7.       └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 8.         └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 9.           └─value[[3L]](cond)
+
+Warning ('test-engineering-standards.R:204:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Error Handling") at test-engineering-standards.R:204:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Error Handling                          
+✔ |   2      3 | Engineering Standards: Error Handling
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-engineering-standards.R:217:3'): Context-aware error handling provides useful diagnostics
+Error in test operation:
+  primary failure
+  Call stack: pairlist(test_local(), test_dir(test_path, package = package,  >     reporter = reporter, ..., load_package = load_package), test_files(test_dir = path,  >     test_paths = test_paths, test_package = package, reporter = reporter,  >     load_helpers = load_helpers, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, load_package = load_package,  >     parallel = parallel), test_files_serial(test_dir = test_dir,  >     test_package = test_package, test_paths = test_paths, load_helpers = load_helpers,  >     reporter = reporter, env = env, stop_on_failure = stop_on_failure,  >     stop_on_warning = stop_on_warning, desc = desc, load_package = load_package,  >     error_call = error_call), with_reporter(reporters$multi,  >     lapply(test_paths, test_one_file, env = env, desc = desc,  >         error_call = error_call)), tryCatch(code, testthat_abort_reporter = function(cnd) { >     cat(conditionMessage(cnd), "\n") >     NULL > }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), lapply(test_paths, test_one_file,  >     env = env, desc = desc, error_call = error_call), FUN(X[[i]],  >     ...), source_file(path, env = env(env), desc = desc, error_call = error_call), test_code(test = NULL,  >     code = exprs, env = env, reporter = get_reporter() %||% StopReporter$new()), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), test_that("Context-aware error handling provides useful diagnostics",  >     { >         expect_error(.try_with_context(stop("primary failure"),  >             context = "test operation"), "Error in test operation:.*primary failure") >         result <- .try_with_context(stop("primary failure"),  >             context = "test operation", fallback = 42) >         expect_equal(result, 42) >         expect_error(.try_with_context(stop("primary failure"),  >             context = "test operation", fallback = stop("fallback failure")),  >             "fallback failure") >     }), test_code(desc, code, env = parent.frame(), reporter = reporter), tryCatch(withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), error = handle_fatal,  >     skip = function(e) { >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(tryCatchList(expr,  >     names[-nh], parentenv, handlers[-nh]), names[nh], parentenv,  >     handlers[[nh]]), doTryCatch(return(expr), name, parentenv,  >     handler), tryCatchList(expr, names[-nh], parentenv, handlers[-nh]), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), doTryCatch(return(expr),  >     name, parentenv, handler), withCallingHandlers({ >     eval(code, test_env) >     if (!handled && !is.null(test)) { >         skip_empty() >     } > }, expectation = handle_expectation, skip = handle_skip, warning = handle_warning,  >     message = handle_message, error = handle_error), eval(code,  >     test_env), eval(code, test_env), .try_with_context(stop("primary failure"),  >     context = "test operation", fallback = 42), .fmriparametric_internal$try_with_context(...), tryCatch(expr,  >     error = function(e) { >         enhanced_msg <- sprintf("Error in %s:\n  %s\n  Call stack: %s",  >             context, e$message, paste(deparse(sys.calls()), collapse = " > ")) >         if (!is.null(fallback)) { >             warning(enhanced_msg, "\n  Attempting fallback...") >             tryCatch(fallback, error = function(e2) { >                 stop(sprintf("%s\n  Fallback also failed: %s",  >                   enhanced_msg, e2$message), call. = FALSE) >             }) >         } else { >             stop(enhanced_msg, call. = FALSE) >         } >     }), tryCatchList(expr, classes, parentenv, handlers), tryCatchOne(expr,  >     names, parentenv, handlers[[1L]]), value[[3L]](cond))
+  Attempting fallback...
+Backtrace:
+    ▆
+ 1. └─fmriparametric:::.try_with_context(...) at test-engineering-standards.R:217:3
+ 2.   └─.fmriparametric_internal$try_with_context(...) at fmriparametry/R/internal-utils.R:94:22
+ 3.     └─base::tryCatch(...) at fmriparametry/R/internal-utils.R:9:3
+ 4.       └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 5.         └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 6.           └─value[[3L]](cond)
+
+Warning ('test-engineering-standards.R:235:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Output Quality Assertions") at test-engineering-standards.R:235:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Output Quality Assertions               
+✔ |   1      4 | Engineering Standards: Output Quality Assertions
+────────────────────────────────────────────────────────────────────────────────
+Warning ('test-engineering-standards.R:279:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Algorithmic Properties") at test-engineering-standards.R:279:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Algorithmic Properties                  
+✖ | 1 1      4 | Engineering Standards: Algorithmic Properties
+────────────────────────────────────────────────────────────────────────────────
+Failure ('test-engineering-standards.R:327:3'): Convolution optimization produces correct results
+`result_opt` (`actual`) not equal to `result_ref` (`expected`).
+
+actual vs expected
+                           [,1]          [,2]
+- actual[1, ]      0.000000e+00  0.000000e+00
++ expected[1, ]    2.368476e-16  9.473903e-16
+- actual[2, ]      0.000000e+00  0.000000e+00
++ expected[2, ]    2.368476e-16  0.000000e+00
+- actual[3, ]      0.000000e+00  0.000000e+00
++ expected[3, ]    2.960595e-16  1.894781e-15
+- actual[4, ]      0.000000e+00  0.000000e+00
++ expected[4, ]    1.184238e-16  0.000000e+00
+- actual[5, ]      0.000000e+00  0.000000e+00
++ expected[5, ]    1.776357e-16  9.473903e-16
+- actual[6, ]      0.000000e+00  0.000000e+00
++ expected[6, ]    0.000000e+00  9.473903e-16
+- actual[7, ]      0.000000e+00  0.000000e+00
++ expected[7, ]    1.776357e-16  0.000000e+00
+- actual[8, ]      0.000000e+00  0.000000e+00
++ expected[8, ]    5.921189e-17  9.473903e-16
+- actual[9, ]      0.000000e+00  0.000000e+00
++ expected[9, ]    5.921189e-17  4.736952e-16
+- actual[10, ]     0.000000e+00  0.000000e+00
++ expected[10, ]   5.921189e-17 -4.736952e-16
+and 90 more ...
+
+Warning ('test-engineering-standards.R:330:1'): (code run outside of `test_that()`)
+`context()` was deprecated in the 3rd edition.
+Backtrace:
+    ▆
+ 1. └─testthat::context("Engineering Standards: Integration Tests") at test-engineering-standards.R:330:1
+ 2.   └─testthat:::edition_deprecate(3, "context()")
+────────────────────────────────────────────────────────────────────────────────
+
+⠏ |          0 | Engineering Standards: Integration Tests                       Not compatible with requested type: [type=NULL; target=double].

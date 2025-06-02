@@ -1,9 +1,4 @@
 .onLoad <- function(libname, pkgname) {
-  # Initialize RcppParallel
-  if (requireNamespace("RcppParallel", quietly = TRUE)) {
-    RcppParallel::setThreadOptions()
-  }
-  
   if (exists(".on_load_options", envir = asNamespace(pkgname))) {
     get(".on_load_options", envir = asNamespace(pkgname))(libname, pkgname)
   }

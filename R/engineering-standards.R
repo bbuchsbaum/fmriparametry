@@ -166,9 +166,18 @@ get_timing_report <- function() {
 #' @return Result of division with safety checks
 #' @keywords internal
 .safe_divide <- function(numerator, denominator, epsilon = .Machine$double.eps) {
-  # Check for zero denominator
+  # Detect special cases
+  inf_num <- is.infinite(numerator)
+  inf_denom <- is.infinite(denominator)
   small_denom <- abs(denominator) < epsilon
   
+  # Handle Inf/Inf cases specifically
+  inf_inf_case <- inf_num & inf_denom
+  if (any(inf_inf_case, na.rm = TRUE)) {
+    warning("Division produced non-finite values")
+  }
+  
+  # Check for zero denominator
   if (any(small_denom, na.rm = TRUE)) {
     warning("Near-zero denominator detected, applying epsilon correction")
     denominator[small_denom] <- sign(denominator[small_denom]) * epsilon
@@ -177,14 +186,18 @@ get_timing_report <- function() {
   
   result <- numerator / denominator
   
-  # Check for non-finite results (including NaN from Inf/Inf)
-  if (any(!is.finite(result), na.rm = TRUE)) {
-    n_invalid <- sum(!is.finite(result), na.rm = TRUE)
+  # Fix Inf/Inf cases to return 0
+  result[inf_inf_case] <- 0
+  
+  # Check for remaining non-finite results
+  remaining_invalid <- !is.finite(result) & !inf_inf_case
+  if (any(remaining_invalid, na.rm = TRUE)) {
+    n_invalid <- sum(remaining_invalid, na.rm = TRUE)
     warning(sprintf(
       "Division produced %d non-finite values, setting to zero",
       n_invalid
     ))
-    result[!is.finite(result)] <- 0
+    result[remaining_invalid] <- 0
   }
   
   result
@@ -223,8 +236,9 @@ get_timing_report <- function() {
     ))
     
     if (regularize) {
-      # Adaptive regularization
-      lambda <- tol * max(diag(crossprod(X)))
+      # Stronger adaptive regularization based on condition number
+      # Increase lambda for very ill-conditioned matrices
+      lambda <- condition * .Machine$double.eps * max(diag(crossprod(X)))
       X <- X + lambda * diag(n)
       message(sprintf("Applied regularization lambda = %.2e", lambda))
     }
@@ -296,10 +310,9 @@ get_timing_report <- function() {
     
     if (!is.null(label)) {
       message(sprintf("[%s] Elapsed time: %.3f seconds", label, elapsed))
+      # Record in global profile only when label is provided
+      .record_timing(label, elapsed)
     }
-    
-    # Record in global profile
-    .record_timing(label, elapsed)
     
     result
   } else {
@@ -334,8 +347,14 @@ get_timing_report <- function() {
 get_timing_report <- function() {
   timings_env <- environment(.record_timing)$timings
   if (length(ls(timings_env)) == 0) {
-    message("No timing data recorded")
-    return(invisible(NULL))
+    # Return empty data frame with correct structure
+    return(data.frame(
+      operation = character(0),
+      count = numeric(0),
+      total_time = numeric(0),
+      mean_time = numeric(0),
+      stringsAsFactors = FALSE
+    ))
   }
   
   # Convert to data frame
@@ -345,7 +364,8 @@ get_timing_report <- function() {
     count = sapply(timing_list, `[[`, "count"),
     total_time = sapply(timing_list, `[[`, "total"),
     mean_time = sapply(timing_list, `[[`, "mean"),
-    row.names = NULL
+    row.names = NULL,
+    stringsAsFactors = FALSE
   )
   
   # Sort by total time
