@@ -17,7 +17,8 @@ test_that("estimate_parametric_hrf works with basic inputs", {
     fmri_data = fmri_data,
     event_model = event_design,
     parametric_hrf = "lwu",
-    verbose = FALSE
+    verbose = FALSE,
+
   )
   
   expect_s3_class(result, "parametric_hrf_fit")
