@@ -329,6 +329,7 @@
 
 #' Print method for error reports
 #' @export
+#' @exportS3Method print fmriparametric_error_report
 print.fmriparametric_error_report <- function(x, ...) {
   cat("=== fmriparametric Error Report ===\n")
   cat("Context:", x$context, "\n")
