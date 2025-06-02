@@ -17,6 +17,7 @@ NULL
 #' @param ... Additional arguments (ignored)
 #' @return The input object invisibly
 #' @export
+#' @exportS3Method print parametric_hrf_fit
 print.parametric_hrf_fit <- function(x, ...) {
   cat("Parametric HRF Fit\n")
   cat("==================\n")
@@ -87,6 +88,7 @@ print.parametric_hrf_fit <- function(x, ...) {
 #' @param ... Additional arguments
 #' @return A list with class `summary.parametric_hrf_fit`
 #' @export
+#' @exportS3Method summary parametric_hrf_fit
 summary.parametric_hrf_fit <- function(object, ...) {
   param_sum <- apply(object$estimated_parameters, 2, summary)
   amp_sum <- summary(object$amplitudes)
@@ -142,6 +144,7 @@ summary.parametric_hrf_fit <- function(object, ...) {
 }
 
 #' @export
+#' @exportS3Method print summary_parametric_hrf_fit
 print.summary_parametric_hrf_fit <- function(x, ...) {
   cat("Summary of Parametric HRF Fit\n")
   cat("=============================\n")
@@ -211,6 +214,7 @@ print.summary_parametric_hrf_fit <- function(x, ...) {
 #' @param ... Additional arguments (ignored)
 #' @return A numeric matrix or vector depending on `type`
 #' @export
+#' @exportS3Method coef parametric_hrf_fit
 coef.parametric_hrf_fit <- function(object,
                                    type = c("parameters", "amplitude", "se"),
                                    ...) {
@@ -239,6 +243,7 @@ coef.parametric_hrf_fit <- function(object,
 #' @param ... Additional arguments passed to plotting functions
 #' @return A ggplot object or list of plots depending on `type`
 #' @export
+#' @exportS3Method plot parametric_hrf_fit
 plot.parametric_hrf_fit <- function(x,
                                     type = c("hrf", "parameters", "diagnostic", "refinement"),
                                     voxels = NULL,
@@ -398,6 +403,7 @@ plot.parametric_hrf_fit <- function(x,
 #' @param ... Additional arguments (ignored)
 #' @return Numeric matrix of residuals or NULL
 #' @export
+#' @exportS3Method residuals parametric_hrf_fit
 residuals.parametric_hrf_fit <- function(object, ...) {
   if (is.null(object$residuals)) {
     warning("No residuals stored in the fit object")
@@ -417,6 +423,7 @@ residuals.parametric_hrf_fit <- function(object, ...) {
 #' @param ... Additional arguments (ignored)
 #' @return Numeric matrix of fitted values or NULL
 #' @export
+#' @exportS3Method fitted parametric_hrf_fit
 fitted.parametric_hrf_fit <- function(object, Y_proj = NULL, ...) {
   if (!is.null(object$fitted_values)) {
     return(object$fitted_values)
