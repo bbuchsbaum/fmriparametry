@@ -429,7 +429,7 @@ estimate_parametric_hrf <- function(
   }
   
   # ========== STAGE 4: TIERED REFINEMENT ==========
-  refinement_info <- NULL
+  refinement_info <- list()
   se_theta <- NULL
   
   if (tiered_refinement != "none") {
@@ -485,6 +485,7 @@ estimate_parametric_hrf <- function(
         r_squared = r_squared,
         hrf_interface = hrf_interface,
         hrf_eval_times = inputs$hrf_eval_times,
+        theta_bounds = theta_bounds,
         local_radius = refinement_thresholds$local_radius,
         parallel = parallel,
         parallel_config = parallel_config
@@ -509,6 +510,7 @@ estimate_parametric_hrf <- function(
         r_squared = r_squared,
         hrf_interface = hrf_interface,
         hrf_eval_times = inputs$hrf_eval_times,
+        theta_bounds = theta_bounds,
         max_iter = refinement_thresholds$gauss_newton_maxiter,
         parallel = parallel,
         parallel_config = parallel_config
@@ -783,7 +785,7 @@ estimate_parametric_hrf <- function(
 # DATA-DRIVEN INITIALIZATION
 .compute_data_driven_seed <- function(Y, S, hrf_interface) {
   default_seed <- hrf_interface$default_seed()
-  bounds <- hrf_interface$default_bounds()
+  bounds <- theta_bounds
 
   # Average high variance voxels
   vars <- apply(Y, 2, var)
@@ -822,7 +824,7 @@ estimate_parametric_hrf <- function(
                 centers = matrix(hrf_interface$default_seed(), nrow = 1)))
   }
 
-  bounds <- hrf_interface$default_bounds()
+  bounds <- theta_bounds
   delays <- seq(-8, 12, by = 1)
   tau_est <- numeric(n_vox)
 
@@ -880,6 +882,7 @@ estimate_parametric_hrf <- function(
 .refine_moderate_voxels <- function(voxel_idx, Y_proj, S_target_proj,
                                     theta_current, r_squared,
                                     hrf_interface, hrf_eval_times,
+                                    theta_bounds = NULL,
                                     local_radius = 1, parallel = FALSE,
                                     n_cores = 1) {
 
@@ -888,7 +891,11 @@ estimate_parametric_hrf <- function(
                 amplitudes = numeric(0)))
   }
 
-  bounds <- hrf_interface$default_bounds()
+  if (is.null(theta_bounds)) {
+    bounds <- hrf_interface$default_bounds()
+  } else {
+    bounds <- theta_bounds
+  }
   n_time <- nrow(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
 
@@ -945,6 +952,7 @@ estimate_parametric_hrf <- function(
 .refine_hard_voxels <- function(voxel_idx, Y_proj, S_target_proj,
                                 theta_current, r_squared,
                                 hrf_interface, hrf_eval_times,
+                                theta_bounds = NULL,
                                 max_iter = 5, parallel = FALSE,
                                 n_cores = 1) {
 
@@ -954,7 +962,11 @@ estimate_parametric_hrf <- function(
   }
 
   n_vox <- ncol(Y_proj)
-  bounds <- hrf_interface$default_bounds()
+  if (is.null(theta_bounds)) {
+    bounds <- hrf_interface$default_bounds()
+  } else {
+    bounds <- theta_bounds
+  }
   queue_labels <- rep("easy", n_vox)
   queue_labels[voxel_idx] <- "hard_GN"
 
