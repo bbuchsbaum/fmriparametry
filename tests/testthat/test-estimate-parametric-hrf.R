@@ -84,7 +84,7 @@ test_that("estimate_parametric_hrf returns expected structure", {
   expect_equal(length(result$amplitudes), ncol(fmri_data))
   
   # Check metadata
-  expect_equal(result$metadata$parametric_hrf, "lwu")
+  expect_equal(result$metadata$hrf_model, "lwu")
   expect_equal(result$metadata$n_voxels, 10)
   expect_equal(result$metadata$n_timepoints, 20)
 })
