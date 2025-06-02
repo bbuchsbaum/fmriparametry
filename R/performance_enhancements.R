@@ -19,6 +19,7 @@
 #' @param cache_key Optional cache identifier
 #' @param lambda_ridge Ridge penalty
 #' @return Solved coefficients
+#' @importFrom digest digest
 .cached_qr_solve <- function(X, Y, cache_key = NULL, lambda_ridge = 0) {
   
   # Create cache key if not provided
