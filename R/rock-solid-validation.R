@@ -160,9 +160,8 @@
   
   # Content checks
   if (sum(abs(design_matrix), na.rm = TRUE) < .Machine$double.eps) {
-    stop(caller, ": event_model contains no events (all zeros). ",
-         "Check your event timing specification.", 
-         call. = FALSE)
+    warning(caller,
+            ": No events detected in event_model. Design matrix may be singular.")
   }
   
   event_density <- mean(design_matrix > 0, na.rm = TRUE)
