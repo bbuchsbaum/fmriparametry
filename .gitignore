@@ -3,3 +3,8 @@
 .Rproj.user/
 .DS_Store
 
+
+# Ignore compiled binaries
+*.o
+*.so
+*.tar.gz
