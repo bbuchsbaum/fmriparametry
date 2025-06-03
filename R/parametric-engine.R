@@ -88,10 +88,11 @@
 
   # 5. Apply bounds if provided
   if (!is.null(theta_bounds)) {
-    for (j in seq_len(n_params)) {
-      theta_hat[, j] <- pmax(theta_bounds$lower[j],
-                            pmin(theta_hat[, j], theta_bounds$upper[j]))
-    }
+    lower <- matrix(theta_bounds$lower,
+                    nrow = n_vox, ncol = n_params, byrow = TRUE)
+    upper <- matrix(theta_bounds$upper,
+                    nrow = n_vox, ncol = n_params, byrow = TRUE)
+    theta_hat <- pmin(upper, pmax(lower, theta_hat))
   }
 
   if (!is.null(hrf_interface$parameter_names)) {

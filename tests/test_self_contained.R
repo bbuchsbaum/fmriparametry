@@ -79,10 +79,11 @@ simple_engine <- function(Y, S, t_hrf, theta_seed, theta_bounds, lambda = 0.01) 
   theta_hat <- matrix(theta_seed, n_vox, n_params, byrow = TRUE) + t(delta_theta)
   
   # Apply bounds
-  for (j in 1:n_params) {
-    theta_hat[, j] <- pmax(theta_bounds$lower[j], 
-                           pmin(theta_hat[, j], theta_bounds$upper[j]))
-  }
+  lower <- matrix(theta_bounds$lower,
+                  nrow = n_vox, ncol = n_params, byrow = TRUE)
+  upper <- matrix(theta_bounds$upper,
+                  nrow = n_vox, ncol = n_params, byrow = TRUE)
+  theta_hat <- pmin(upper, pmax(lower, theta_hat))
   
   # Calculate R-squared
   Y_pred <- X %*% coeffs
