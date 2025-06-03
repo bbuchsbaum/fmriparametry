@@ -138,8 +138,9 @@
         mem_available <- mem_total * 0.7  # Use 70% of total
         mem_available
       }, silent = TRUE)
-      
-      if (inherits(mem_info, "try-error")) {
+
+      if (inherits(mem_info, "try-error") ||
+          !is.numeric(mem_info) || is.na(mem_info)) {
         # Fallback: assume 8GB available
         memory_limit <- 8e9
       } else {
@@ -149,6 +150,11 @@
       # Windows fallback
       memory_limit <- 8e9  # 8GB
     }
+  }
+
+  # Validate provided memory_limit before use
+  if (!is.numeric(memory_limit) || is.na(memory_limit)) {
+    memory_limit <- 8e9
   }
   
   use_chunking <- working_memory > memory_limit
