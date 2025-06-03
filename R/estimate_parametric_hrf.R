@@ -1065,7 +1065,7 @@ estimate_parametric_hrf <- function(
     hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_updated[v, ])
     conv_full <- stats::convolve(S_target_proj[, 1], rev(hrf_vals), type = "open")
     x_pred <- conv_full[seq_len(n_time)]
-    sum(x_pred * Y_proj[, v]) / sum(x_pred^2)
+    as.numeric(crossprod(x_pred, Y_proj[, v])) / sum(x_pred^2)
   }
 
   amps <- vapply(voxel_idx, amp_fun, numeric(1))
