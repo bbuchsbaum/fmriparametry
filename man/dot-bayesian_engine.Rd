@@ -9,7 +9,7 @@
 \arguments{
 \item{Y}{Numeric vector of observed BOLD data}
 
-\item{X}{Design matrix for the predicted response}
+\item{X}{Numeric vector representing the predicted response (single-column design)}
 
 \item{priors}{List with elements \code{mean}, \code{var} and \code{sigma2}}
 
