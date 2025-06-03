@@ -102,7 +102,7 @@
       )
       
       if (is.null(jacob_info)) {
-        convergence_status[i] <- "jacobian_failed"
+        convergence_status[i] <- "singular_system"
         break
       }
       
@@ -284,7 +284,11 @@
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]
-  beta <- sum(x_hrf * y) / sum(x_hrf^2)
+  denom_amp <- sum(x_hrf^2)
+  if (denom_amp < 1e-8) {
+    return(NULL)
+  }
+  beta <- sum(x_hrf * y) / denom_amp
   
   # Residuals
   residuals <- y - beta * x_hrf
@@ -297,7 +301,9 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
-    dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / sum(x_hrf^2)
+    denom <- denom_amp
+    num <- sum(dx_dtheta_k * y) - 2 * beta * sum(dx_dtheta_k * x_hrf)
+    dbeta_dtheta_k <- num / denom
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf
