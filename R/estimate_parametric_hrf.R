@@ -160,7 +160,8 @@ estimate_parametric_hrf <- function(
     theta_seed <- .compute_data_driven_seed(
       Y = inputs$Y_proj,
       S = inputs$S_target_proj,
-      hrf_interface = hrf_interface
+      hrf_interface = hrf_interface,
+      theta_bounds = theta_bounds
     )
   } else {
     if (!is.numeric(theta_seed)) {
@@ -209,7 +210,8 @@ estimate_parametric_hrf <- function(
       Y = inputs$Y_proj,
       S = inputs$S_target_proj,
       k = kmeans_k,
-      hrf_interface = hrf_interface
+      hrf_interface = hrf_interface,
+      theta_bounds = theta_bounds
     )
     # Update seeds based on clusters
     for (k in seq_len(kmeans_k)) {
@@ -782,7 +784,20 @@ estimate_parametric_hrf <- function(
 
 
 # DATA-DRIVEN INITIALIZATION
-.compute_data_driven_seed <- function(Y, S, hrf_interface) {
+#'
+#' Compute data-driven initial HRF parameters
+#'
+#' Estimates latency and width by cross-correlating the average high-variance
+#' voxels with the stimulus.
+#'
+#' @param Y BOLD signal matrix (time x voxels)
+#' @param S Stimulus design matrix
+#' @param hrf_interface HRF model interface
+#' @param theta_bounds List with parameter lower and upper bounds
+#'
+#' @return Numeric vector of initial parameter estimates
+#' @keywords internal
+.compute_data_driven_seed <- function(Y, S, hrf_interface, theta_bounds) {
   default_seed <- hrf_interface$default_seed()
   bounds <- theta_bounds
 
@@ -816,7 +831,21 @@ estimate_parametric_hrf <- function(
 }
 
 # K-MEANS INITIALIZATION
-.perform_kmeans_initialization <- function(Y, S, k, hrf_interface) {
+#'
+#' Initialize HRF parameters with K-means clustering
+#'
+#' Voxels are clustered by their estimated latency from cross-correlation and
+#' cluster-specific seeds are derived.
+#'
+#' @param Y BOLD signal matrix
+#' @param S Stimulus design matrix
+#' @param k Number of clusters
+#' @param hrf_interface HRF model interface
+#' @param theta_bounds List with parameter lower and upper bounds
+#'
+#' @return List with cluster assignments and center parameter seeds
+#' @keywords internal
+.perform_kmeans_initialization <- function(Y, S, k, hrf_interface, theta_bounds) {
   n_vox <- ncol(Y)
   if (k <= 1 || n_vox <= k) {
     return(list(cluster = rep(1, n_vox),
