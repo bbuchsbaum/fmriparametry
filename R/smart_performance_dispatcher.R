@@ -28,9 +28,17 @@
   } else {
     # Direct method for small problems
     design_matrix <- matrix(0, output_length, n_kernels)
+    warned <- FALSE
     for (j in seq_len(n_kernels)) {
       conv_full <- convolve(signal, rev(kernels[, j]), type = "open")
-      design_matrix[, j] <- conv_full[seq_len(output_length)]
+      max_len <- min(output_length, length(conv_full))
+      design_matrix[seq_len(max_len), j] <- conv_full[seq_len(max_len)]
+      if (output_length > length(conv_full) && !warned) {
+        warning(
+          "Requested output_length exceeds convolution result; padding with zeros."
+        )
+        warned <- TRUE
+      }
     }
     return(design_matrix)
   }

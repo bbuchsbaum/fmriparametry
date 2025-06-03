@@ -22,5 +22,6 @@ Smart convolution dispatcher
 }
 \details{
 Automatically chooses between direct convolution and FFT based on problem size.
-This ensures optimal performance across all problem scales.
+This ensures optimal performance across all problem scales. If \code{output_length} is
+greater than the length of the convolution result, the remainder is padded with zeros.
 }
