@@ -11,10 +11,6 @@
 #' @return List with posterior mean, sd and samples
 #' @keywords internal
 .bayesian_engine <- function(Y, X, priors, mcmc_samples = 1000) {
-### <<<<<<< codex/optimize-calculations-with-crossprod
-  XtX <- as.numeric(crossprod(X))
-  Xty <- as.numeric(crossprod(X, Y))
-
   # Validate Y and X
   if (!is.numeric(Y) || !is.vector(Y)) {
     stop(".bayesian_engine: Y must be a numeric vector", call. = FALSE)
@@ -52,9 +48,8 @@
     stop(".bayesian_engine: mcmc_samples must be a positive integer", call. = FALSE)
   }
 
-  XtX <- sum(X * X)
-  Xty <- sum(X * Y)
-## >>>>>>> main
+  XtX <- as.numeric(crossprod(X))
+  Xty <- as.numeric(crossprod(X, Y))
   post_var <- 1 / (1/priors$var + XtX / priors$sigma2)
   post_mean <- post_var * (priors$mean / priors$var + Xty / priors$sigma2)
   samples <- rnorm(mcmc_samples, post_mean, sqrt(post_var))
