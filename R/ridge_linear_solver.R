@@ -12,6 +12,19 @@
   if (!is.matrix(Y)) {
     stop("Y must be a matrix in .ridge_linear_solve")
   }
+
+  # Check that matrices have positive dimensions
+  if (nrow(X) <= 0 || ncol(X) <= 0) {
+    stop("X must have positive dimensions")
+  }
+  if (nrow(Y) <= 0 || ncol(Y) <= 0) {
+    stop("Y must have positive dimensions")
+  }
+
+  # Ensure both matrices have the same number of rows
+  if (nrow(X) != nrow(Y)) {
+    stop("X and Y must have the same number of rows")
+  }
   
   # Check for NULL or empty inputs
   if (is.null(X) || length(X) == 0) {
