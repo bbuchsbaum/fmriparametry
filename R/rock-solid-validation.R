@@ -302,6 +302,9 @@
 }
 
 #' Master validation function that orchestrates all checks
+#'
+#' This helper is invoked when `validation_level` is set to
+#' "comprehensive" and applies every available validation routine.
 #' @keywords internal
 .rock_solid_validate_inputs <- function(
   fmri_data,

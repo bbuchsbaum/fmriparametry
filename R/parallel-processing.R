@@ -360,10 +360,10 @@
     for (iter in seq_len(max_iter_gn)) {
       # Get Jacobian and residuals
       jacob_info <- .get_jacobian_and_residuals(
-        theta_current, y_v, prepared_data$S_target_proj, 
+        theta_current, y_v, prepared_data$S_target_proj,
         prepared_data$hrf_eval_times, hrf_interface, nrow(prepared_data$Y_proj)
       )
-      
+
       if (is.null(jacob_info)) break
       
       # Compute update
@@ -387,7 +387,11 @@
           theta_new, y_v, prepared_data$S_target_proj,
           prepared_data$hrf_eval_times, hrf_interface, nrow(prepared_data$Y_proj)
         )
-        
+
+        if (is.infinite(obj_new)) {
+          break
+        }
+
         obj_current <- sum(jacob_info$residuals^2)
         if (obj_new < obj_current) break
         alpha <- alpha * 0.5
@@ -406,7 +410,7 @@
     hrf_vals <- hrf_interface$hrf_function(prepared_data$hrf_eval_times, theta_current)
     conv_full <- stats::convolve(prepared_data$S_target_proj[, 1], rev(hrf_vals), type = "open")
     x_pred <- conv_full[seq_len(nrow(prepared_data$Y_proj))]
-    beta_new <- sum(x_pred * y_v) / sum(x_pred^2)
+    beta_new <- as.numeric(crossprod(x_pred, y_v)) / sum(x_pred^2)
     r2_new <- 1 - sum((y_v - beta_new * x_pred)^2) / sum((y_v - mean(y_v))^2)
     
     list(

@@ -79,10 +79,17 @@
 #' @param fmri_data Large fMRI dataset (can be file path or matrix)
 #' @param process_function Function to apply to each chunk
 #' @param chunk_size Number of voxels per chunk
+#' @param combine_fun Function used to combine the chunk results
+#'   (defaults to \code{cbind})
 #' @param progress Show progress bar?
 #' @return Combined results across all chunks
-.chunked_processing <- function(fmri_data, process_function, chunk_size = 1000, 
+.chunked_processing <- function(fmri_data, process_function, chunk_size = 1000,
+                               combine_fun = cbind,
                                progress = TRUE, ...) {
+
+  if (!is.numeric(chunk_size) || chunk_size <= 0) {
+    stop("chunk_size must be a positive integer")
+  }
   
   # Determine total number of voxels
   if (is.character(fmri_data)) {
@@ -133,9 +140,10 @@
     close(pb)
     cat("\nChunked processing complete!\n")
   }
-  
-  # Combine results (implementation depends on result type)
-  return(results_list)
+
+  # Combine results
+  combined <- do.call(combine_fun, results_list)
+  return(combined)
 }
 
 # OPTIMIZATION 4: SIMD-Friendly Vectorization (2x speedup)
@@ -206,10 +214,12 @@
 #' @param S_target_proj Design matrix
 #' @param profiling_fraction Fraction of data to use for profiling
 #' @return List with optimal algorithm and estimated performance
+#' @details When profiling parallel performance this function uses
+#'   \code{parallel::parLapply} on Windows and \code{parallel::mclapply}
+#'   elsewhere.
 .adaptive_algorithm_selection <- function(Y_proj, S_target_proj, profiling_fraction = 0.1) {
   
   n_vox <- ncol(Y_proj)
-  n_time <- nrow(Y_proj)
   
   # Quick heuristics for small problems
   if (n_vox < 100) {
@@ -247,10 +257,18 @@
     algorithms$parallel <- system.time({
       # Simplified parallel test
       chunk_size <- ceiling(n_profile / 2)
-      chunks <- list(1:chunk_size, (chunk_size+1):n_profile)
-      parallel::mclapply(chunks, function(idx) {
-        qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
-      }, mc.cores = 2)
+      chunks <- list(1:chunk_size, (chunk_size + 1):n_profile)
+      if (.Platform$OS.type == "windows") {
+        cl <- parallel::makeCluster(min(2, n_cores))
+        on.exit(parallel::stopCluster(cl), add = TRUE)
+        parallel::parLapply(cl, chunks, function(idx) {
+          qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
+        })
+      } else {
+        parallel::mclapply(chunks, function(idx) {
+          qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
+        }, mc.cores = min(2, n_cores))
+      }
     })["elapsed"]
   }
   

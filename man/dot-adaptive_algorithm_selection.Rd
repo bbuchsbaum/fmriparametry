@@ -19,4 +19,6 @@ List with optimal algorithm and estimated performance
 \description{
 Profiles different approaches and selects the fastest for current hardware
 and data characteristics. Provides optimal performance across problem sizes.
+When profiling parallel execution it uses \code{parallel::parLapply} on
+Windows and \code{parallel::mclapply} on other platforms.
 }
