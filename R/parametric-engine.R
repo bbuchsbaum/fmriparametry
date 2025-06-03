@@ -31,6 +31,18 @@
   lambda_ridge = 0.01,
   verbose = FALSE
 ) {
+  # Validate inputs before computing dimensions
+  .validate_input(Y_proj, "Y_proj", type = "matrix")
+  .validate_input(S_target_proj, "S_target_proj", type = "matrix")
+  if (nrow(S_target_proj) != nrow(Y_proj)) {
+    stop(
+      sprintf(
+        "S_target_proj must have %d rows to match Y_proj", nrow(Y_proj)
+      ),
+      call. = FALSE
+    )
+  }
+
   n_time   <- nrow(Y_proj)
   n_vox    <- ncol(Y_proj)
   n_params <- length(theta_seed)
