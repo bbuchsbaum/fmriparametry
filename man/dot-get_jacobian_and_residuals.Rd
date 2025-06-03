@@ -9,4 +9,8 @@
 \description{
 Get Jacobian matrix and residuals for Gauss-Newton
 }
+\details{
+Returns \code{NULL} when the amplitude denominator \eqn{\sum x\_hrf^2} is
+effectively zero, indicating a singular system.
+}
 \keyword{internal}
