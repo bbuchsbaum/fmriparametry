@@ -30,7 +30,13 @@
 #' @param parallel Logical: use parallel processing?
 #' @param n_cores Number of cores for parallel processing (NULL = auto-detect)
 #' @param compute_se Logical: compute standard errors?
-#' @param safety_mode Character: "maximum", "balanced", or "performance"
+#' @param safety_mode Character: "maximum", "balanced", or "performance".
+#'   Determines the level of input validation. "maximum" triggers
+#'   comprehensive checks, "balanced" performs standard checks, and
+#'   "performance" uses minimal validation.
+#'
+#'   The chosen level controls which helper functions (e.g.,
+#'   \code{.validate_fmri_data}) are executed before fitting.
 #' @param progress Logical: show progress bar?
 #' @param verbose Logical: print detailed messages?
 #'
@@ -126,6 +132,46 @@ estimate_parametric_hrf <- function(
     balanced = "standard",
     performance = "minimal"
   )
+
+  # Run input validation helpers depending on level
+
+  caller <- "estimate_parametric_hrf"
+
+  if (validation_level == "comprehensive") {
+    .rock_solid_validate_inputs(
+      fmri_data = fmri_data,
+      event_model = event_model,
+      parametric_hrf = parametric_hrf,
+      theta_seed = theta_seed,
+      theta_bounds = theta_bounds,
+      hrf_span = hrf_span,
+      lambda_ridge = lambda_ridge,
+      recenter_global_passes = global_passes,
+      recenter_epsilon = convergence_epsilon,
+      r2_threshold = 0.1,
+      mask = mask,
+      verbose = verbose,
+      caller = caller
+    )
+  } else if (validation_level == "standard") {
+    fmri_ok <- .validate_fmri_data(fmri_data, caller)
+    .validate_event_model(event_model, fmri_ok$n_time, caller)
+    theta_bounds <- .validate_theta_bounds(
+      theta_bounds,
+      length(.create_hrf_interface(parametric_hrf)$parameter_names),
+      .create_hrf_interface(parametric_hrf)$parameter_names,
+      caller
+    )
+  } else {
+    if (is.null(fmri_data)) {
+      stop(caller, ": fmri_data cannot be NULL.", call. = FALSE)
+    }
+    if (is.null(event_model)) {
+      stop(caller, ": event_model cannot be NULL.", call. = FALSE)
+    }
+  }
+
+  # ========== STAGE 0A: Data preparation ==========
   
   # Create HRF interface
   hrf_interface <- .create_hrf_interface(parametric_hrf)

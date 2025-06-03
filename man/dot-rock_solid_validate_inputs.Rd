@@ -22,5 +22,7 @@
 }
 \description{
 Master validation function that orchestrates all checks
+This helper is only called when validation level is set to
+\code{"comprehensive"}.
 }
 \keyword{internal}
