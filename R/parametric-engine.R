@@ -12,6 +12,11 @@
 #' @param lambda_ridge Numeric ridge penalty (default: 0.01)
 #' @param verbose Logical whether to print progress (default: FALSE)
 #'
+#' @note
+#' This engine assumes evenly spaced scan times (constant TR).
+#' If acquisition times vary, adjust the stimulus design or
+#' interpolate the data before calling this function.
+#'
 #' @return List with elements:
 #'   - `theta_hat`: Matrix of parameter estimates (voxels x parameters)
 #'   - `beta0`: Numeric vector of amplitudes
