@@ -5,7 +5,7 @@
 #' amplitude parameter while treating the HRF parameters as fixed.
 #'
 #' @param Y Numeric vector of observed BOLD data
-#' @param X Design matrix for the predicted response
+#' @param X Numeric vector representing the predicted response (single-column design)
 #' @param priors List with elements `mean`, `var` and `sigma2`
 #' @param mcmc_samples Number of posterior samples to draw
 #' @return List with posterior mean, sd and samples
