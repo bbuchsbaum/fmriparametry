@@ -657,7 +657,8 @@ estimate_parametric_hrf <- function(
 
 .parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times,
                                        hrf_interface, theta_seed, theta_bounds,
-                                       lambda_ridge = 0.01, parallel_config) {
+                                       lambda_ridge = 0.01, parallel_config,
+                                       epsilon_beta = 1e-6) {
 
   n_vox <- ncol(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
@@ -673,6 +674,7 @@ estimate_parametric_hrf <- function(
       theta_seed = theta_seed,
       theta_bounds = theta_bounds,
       lambda_ridge = lambda_ridge,
+      epsilon_beta = epsilon_beta,
       verbose = FALSE
     )
     list(list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0))
