@@ -12,6 +12,9 @@
   bounds <- .lwu_hrf_default_bounds()
   params_vector <- pmax(bounds$lower, pmin(params_vector, bounds$upper))
   
+  # Ensure sigma is strictly > 0.05 as required by fmrireg
+  params_vector[2] <- max(params_vector[2], 0.051)
+  
   fmrireg::hrf_lwu(t = t,
                    tau = params_vector[1],
                    sigma = params_vector[2],
@@ -71,7 +74,7 @@
 #' @keywords internal
 .lwu_hrf_default_bounds <- function() {
   list(
-    lower = c(0, 0.05, 0),
+    lower = c(0, 0.051, 0),  # sigma must be strictly > 0.05 for fmrireg
     upper = c(20, 10, 1.5)
   )
 }

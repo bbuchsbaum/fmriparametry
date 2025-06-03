@@ -10,6 +10,11 @@
 test_output.txt
 test_results.txt
 
+# Compiled files
+*.o
+*.so
+*.dll
+
 # Local demo/quick test scripts
 debug_test.R
 quick_test.R

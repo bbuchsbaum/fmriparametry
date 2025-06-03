@@ -285,8 +285,8 @@ plot.parametric_hrf_fit <- function(x,
     
     # Ensure parameters are within valid bounds for HRF evaluation
     if (x$hrf_model == "lwu") {
-      # Enforce minimum sigma value
-      theta[2] <- max(theta[2], 0.05)
+      # Enforce minimum sigma value - must be strictly > 0.05 for fmrireg
+      theta[2] <- max(theta[2], 0.051)
     }
     
     hrf_curves[, i] <- x$amplitudes[v] * hrf_fn(t_hrf, theta)
