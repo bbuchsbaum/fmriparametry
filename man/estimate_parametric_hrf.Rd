@@ -90,6 +90,7 @@ Object of class 'parametric_hrf_fit' containing:
 \item standard_errors: Parameter standard errors (if computed)
 \item fit_quality: List with R-squared and other metrics
 \item convergence_info: Detailed convergence information
+Convergence summaries include global iteration counts and, when tiered refinement is used, Gauss-Newton statistics.
 \item refinement_info: Information about refinement strategies applied
 \item metadata: Complete analysis metadata
 }
@@ -104,6 +105,9 @@ voxels.
 Global iterative refinement (Stage 3) is controlled by the option
 \code{fmriparametric.refine_global}. Set to \code{FALSE} to disable global re-centering
 for all calls.
+}
+\section{Iteration and Convergence}{
+The core estimation stage performs a single Taylor approximation pass around the starting parameters. When \code{global_refinement = TRUE}, this seed is iteratively updated for up to \code{global_passes} iterations until the maximum parameter change is below \code{convergence_epsilon}. Optional K-means initialization supplies alternative seeds before this loop. Tiered refinement applies local recentering or Gauss-Newton optimization with its own iteration limits such as \code{refinement_thresholds$gauss_newton_maxiter}.
 }
 
 \examples{
