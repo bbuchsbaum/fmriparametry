@@ -2,6 +2,7 @@
 
 S3method(coef,parametric_hrf_fit)
 S3method(fitted,parametric_hrf_fit)
+S3method(predict,parametric_hrf_fit)
 S3method(plot,parametric_hrf_fit)
 S3method(print,fmriparametric_error_report)
 S3method(print,parametric_hrf_fit)

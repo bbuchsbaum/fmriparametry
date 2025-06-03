@@ -37,10 +37,17 @@ test_that("S3 methods work for parametric_hrf_fit objects", {
   resid_values <- residuals(fit)
   expect_true(is.matrix(resid_values))
   expect_equal(dim(resid_values), c(20, 5))
-  
+
   # Check that fitted + residuals = original data (approximately)
   reconstructed <- fitted_values + resid_values
   expect_equal(reconstructed, fmri_data, tolerance = 1e-10)
+
+  # Test predict method
+  preds <- predict(fit, newdata = event_design)
+  expect_true(is.matrix(preds))
+  expect_equal(dim(preds), c(20, 5))
+  preds_sub <- predict(fit, newdata = event_design, voxel_indices = 2:3)
+  expect_equal(dim(preds_sub), c(20, 2))
 })
 
 test_that("plot method works for parametric_hrf_fit", {

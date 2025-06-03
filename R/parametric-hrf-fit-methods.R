@@ -481,3 +481,59 @@ fitted.parametric_hrf_fit <- function(object, Y_proj = NULL, ...) {
   warning("Cannot compute fitted values without residuals")
   NULL
 }
+
+#' Predict BOLD responses from a parametric_hrf_fit
+#'
+#' Generates predicted time series using the estimated HRF parameters and
+#' stimulus design. When `newdata` is `NULL` the function attempts to use the
+#' original design matrix stored in the fit object's metadata.  Predictions are
+#' returned for the selected voxels.
+#'
+#' @param object A `parametric_hrf_fit` object
+#' @param newdata Optional stimulus design matrix in projected space
+#'   (`S_target_proj` format). If `NULL`, uses the design stored in
+#'   `object$metadata$S_target_proj` when available.
+#' @param voxel_indices Integer vector of voxel indices to predict. Defaults to
+#'   all voxels.
+#' @param ... Additional arguments (ignored)
+#' @return Numeric matrix of predicted time series (timepoints x voxels)
+#' @export
+predict.parametric_hrf_fit <- function(object,
+                                       newdata = NULL,
+                                       voxel_indices = NULL,
+                                       ...) {
+  if (is.null(voxel_indices)) {
+    voxel_indices <- seq_len(nrow(object$estimated_parameters))
+  }
+
+  if (is.null(newdata)) {
+    newdata <- object$metadata$S_target_proj
+    if (is.null(newdata)) {
+      stop("newdata must be supplied when original design is unavailable")
+    }
+  }
+
+  if (is.null(dim(newdata))) {
+    newdata <- matrix(newdata, ncol = 1)
+  }
+
+  hrf_eval_times <- object$metadata$hrf_eval_times
+  if (is.null(hrf_eval_times)) {
+    hrf_eval_times <- seq(0, 30, length.out = 61)
+  }
+
+  hrf_interface <- .get_hrf_interface(object$hrf_model)
+  n_time <- nrow(newdata)
+  result <- matrix(NA_real_, nrow = n_time, ncol = length(voxel_indices))
+
+  for (i in seq_along(voxel_indices)) {
+    v <- voxel_indices[i]
+    theta_v <- object$estimated_parameters[v, ]
+    beta0_v <- object$amplitudes[v]
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
+    conv <- .batch_convolution(newdata, matrix(hrf_vals, ncol = 1), n_time)
+    result[, i] <- beta0_v * conv[, 1]
+  }
+
+  result
+}
