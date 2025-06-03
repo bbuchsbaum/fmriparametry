@@ -10,7 +10,8 @@
       coef = coef.parametric_hrf_fit,
       summary = summary.parametric_hrf_fit,
       fitted = fitted.parametric_hrf_fit,
-      residuals = residuals.parametric_hrf_fit
+      residuals = residuals.parametric_hrf_fit,
+      predict = predict.parametric_hrf_fit
     )
     for (generic in names(methods)) {
       registerS3method(generic, "parametric_hrf_fit", methods[[generic]],
