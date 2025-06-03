@@ -9,7 +9,7 @@
   data,
   chunk_size,
   process_fun,
-  combine_fun = rbind,
+  combine_fun = cbind,
   progress = TRUE,
   ...
 )
@@ -18,7 +18,7 @@
   data,
   chunk_size,
   process_fun,
-  combine_fun = rbind,
+  combine_fun = cbind,
   progress = TRUE,
   ...
 )
@@ -31,6 +31,7 @@
 \item{fmri_data}{Large fMRI dataset (can be file path or matrix)}
 
 \item{process_function}{Function to apply to each chunk}
+\item{combine_fun}{Function used to combine the chunk results}
 }
 \value{
 Combined results across all chunks
@@ -38,5 +39,6 @@ Combined results across all chunks
 \description{
 Processes voxels in chunks to handle datasets that don't fit in memory.
 Enables processing of 100k+ voxels without memory issues.
+If \code{chunk_size} is less than or equal to zero, an error is thrown.
 }
 \keyword{internal}

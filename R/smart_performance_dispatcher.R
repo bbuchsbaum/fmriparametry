@@ -28,9 +28,17 @@
   } else {
     # Direct method for small problems
     design_matrix <- matrix(0, output_length, n_kernels)
+    warned <- FALSE
     for (j in seq_len(n_kernels)) {
       conv_full <- convolve(signal, rev(kernels[, j]), type = "open")
-      design_matrix[, j] <- conv_full[seq_len(output_length)]
+      max_len <- min(output_length, length(conv_full))
+      design_matrix[seq_len(max_len), j] <- conv_full[seq_len(max_len)]
+      if (output_length > length(conv_full) && !warned) {
+        warning(
+          "Requested output_length exceeds convolution result; padding with zeros."
+        )
+        warned <- TRUE
+      }
     }
     return(design_matrix)
   }
@@ -79,7 +87,13 @@
 .smart_parallel_decision <- function(n_voxels, n_cores = NULL, overhead_per_voxel = 0.001) {
   
   if (is.null(n_cores)) {
-    n_cores <- parallel::detectCores() - 1
+    n_cores <- parallel::detectCores()
+    n_cores <- as.integer(n_cores)
+    if (is.na(n_cores)) {
+      n_cores <- 1L
+    } else {
+      n_cores <- max(1L, n_cores - 1L)
+    }
   }
   
   # Minimum voxels per core to justify parallelization
@@ -89,8 +103,8 @@
   serial_time <- n_voxels * 0.001  # Rough estimate: 1ms per voxel
   parallel_overhead <- overhead_per_voxel * n_voxels
   parallel_time <- (serial_time / n_cores) + parallel_overhead
-  
-  efficiency <- serial_time / parallel_time
+
+  efficiency <- if (parallel_time > 0) serial_time / parallel_time else Inf
   
   use_parallel <- (
     n_voxels > min_voxels_per_core * n_cores &&  # Enough work per core
@@ -138,8 +152,9 @@
         mem_available <- mem_total * 0.7  # Use 70% of total
         mem_available
       }, silent = TRUE)
-      
-      if (inherits(mem_info, "try-error")) {
+
+      if (inherits(mem_info, "try-error") ||
+          !is.numeric(mem_info) || is.na(mem_info)) {
         # Fallback: assume 8GB available
         memory_limit <- 8e9
       } else {
@@ -149,6 +164,11 @@
       # Windows fallback
       memory_limit <- 8e9  # 8GB
     }
+  }
+
+  # Validate provided memory_limit before use
+  if (!is.numeric(memory_limit) || is.na(memory_limit)) {
+    memory_limit <- 8e9
   }
   
   use_chunking <- working_memory > memory_limit

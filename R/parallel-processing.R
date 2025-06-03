@@ -360,10 +360,10 @@
     for (iter in seq_len(max_iter_gn)) {
       # Get Jacobian and residuals
       jacob_info <- .get_jacobian_and_residuals(
-        theta_current, y_v, prepared_data$S_target_proj, 
+        theta_current, y_v, prepared_data$S_target_proj,
         prepared_data$hrf_eval_times, hrf_interface, nrow(prepared_data$Y_proj)
       )
-      
+
       if (is.null(jacob_info)) break
       
       # Compute update
@@ -387,7 +387,11 @@
           theta_new, y_v, prepared_data$S_target_proj,
           prepared_data$hrf_eval_times, hrf_interface, nrow(prepared_data$Y_proj)
         )
-        
+
+        if (is.infinite(obj_new)) {
+          break
+        }
+
         obj_current <- sum(jacob_info$residuals^2)
         if (obj_new < obj_current) break
         alpha <- alpha * 0.5

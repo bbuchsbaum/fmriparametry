@@ -11,6 +11,7 @@
 #' @param theta_seed Numeric vector of starting parameters
 #' @param theta_bounds List with elements `lower` and `upper`
 #' @param lambda_ridge Numeric ridge penalty (default: 0.01)
+#' @param epsilon_beta Small value to avoid division by zero when beta0 is extremely small (default: 1e-6)
 #' @param verbose Logical whether to print progress (default: FALSE)
 #'
 #' @return List with elements:
@@ -29,8 +30,21 @@
   theta_seed,
   theta_bounds,
   lambda_ridge = 0.01,
+  epsilon_beta = 1e-6,
   verbose = FALSE
 ) {
+  # Validate inputs before computing dimensions
+  .validate_input(Y_proj, "Y_proj", type = "matrix")
+  .validate_input(S_target_proj, "S_target_proj", type = "matrix")
+  if (nrow(S_target_proj) != nrow(Y_proj)) {
+    stop(
+      sprintf(
+        "S_target_proj must have %d rows to match Y_proj", nrow(Y_proj)
+      ),
+      call. = FALSE
+    )
+  }
+
   n_time   <- nrow(Y_proj)
   n_vox    <- ncol(Y_proj)
   n_params <- length(theta_seed)
@@ -62,8 +76,8 @@
   beta0 <- coeffs[1, ]
   # Avoid division by zero when beta0 is extremely small
   beta0_safe <- ifelse(
-    abs(beta0) < 1e-6,
-    ifelse(beta0 < 0, -1e-6, 1e-6),
+    abs(beta0) < epsilon_beta,
+    ifelse(beta0 < 0, -epsilon_beta, epsilon_beta),
     beta0
   )
   delta_theta <- coeffs[2:(n_params + 1), , drop = FALSE] /
@@ -74,10 +88,11 @@
 
   # 5. Apply bounds if provided
   if (!is.null(theta_bounds)) {
-    for (j in seq_len(n_params)) {
-      theta_hat[, j] <- pmax(theta_bounds$lower[j],
-                            pmin(theta_hat[, j], theta_bounds$upper[j]))
-    }
+    lower <- matrix(theta_bounds$lower,
+                    nrow = n_vox, ncol = n_params, byrow = TRUE)
+    upper <- matrix(theta_bounds$upper,
+                    nrow = n_vox, ncol = n_params, byrow = TRUE)
+    theta_hat <- pmin(upper, pmax(lower, theta_hat))
   }
 
   if (!is.null(hrf_interface$parameter_names)) {
