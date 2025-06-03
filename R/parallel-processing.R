@@ -406,7 +406,7 @@
     hrf_vals <- hrf_interface$hrf_function(prepared_data$hrf_eval_times, theta_current)
     conv_full <- stats::convolve(prepared_data$S_target_proj[, 1], rev(hrf_vals), type = "open")
     x_pred <- conv_full[seq_len(nrow(prepared_data$Y_proj))]
-    beta_new <- sum(x_pred * y_v) / sum(x_pred^2)
+    beta_new <- as.numeric(crossprod(x_pred, y_v)) / sum(x_pred^2)
     r2_new <- 1 - sum((y_v - beta_new * x_pred)^2) / sum((y_v - mean(y_v))^2)
     
     list(

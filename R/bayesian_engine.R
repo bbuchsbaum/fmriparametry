@@ -11,8 +11,8 @@
 #' @return List with posterior mean, sd and samples
 #' @keywords internal
 .bayesian_engine <- function(Y, X, priors, mcmc_samples = 1000) {
-  XtX <- sum(X * X)
-  Xty <- sum(X * Y)
+  XtX <- as.numeric(crossprod(X))
+  Xty <- as.numeric(crossprod(X, Y))
   post_var <- 1 / (1/priors$var + XtX / priors$sigma2)
   post_mean <- post_var * (priors$mean / priors$var + Xty / priors$sigma2)
   samples <- rnorm(mcmc_samples, post_mean, sqrt(post_var))

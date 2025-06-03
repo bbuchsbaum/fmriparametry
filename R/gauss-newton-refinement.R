@@ -257,7 +257,7 @@
   x_pred_raw <- conv_full[seq_len(n_time)]
   
   # Fit amplitude analytically
-  beta <- sum(x_pred_raw * y) / sum(x_pred_raw^2)
+  beta <- as.numeric(crossprod(x_pred_raw, y)) / sum(x_pred_raw^2)
   x_pred <- beta * x_pred_raw
   
   # Return sum of squared residuals
@@ -284,7 +284,7 @@
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]
-  beta <- sum(x_hrf * y) / sum(x_hrf^2)
+  beta <- as.numeric(crossprod(x_hrf, y)) / sum(x_hrf^2)
   
   # Residuals
   residuals <- y - beta * x_hrf
@@ -297,7 +297,8 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
-    dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / sum(x_hrf^2)
+    dbeta_dtheta_k <- (as.numeric(crossprod(dx_dtheta_k, y)) -
+      beta * as.numeric(crossprod(dx_dtheta_k, x_hrf))) / sum(x_hrf^2)
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf
