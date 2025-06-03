@@ -237,6 +237,41 @@ coef.parametric_hrf_fit <- function(object,
   result
 }
 
+#' Variance-covariance matrix for parametric_hrf_fit parameters
+#'
+#' Returns the estimated variance-covariance matrix for the HRF parameters of
+#' one or more voxels. If only a single voxel index is supplied a matrix is
+#' returned; otherwise a list of matrices is produced. When full covariance
+#' information was not retained during fitting, the matrix is constructed using
+#' the available standard errors (i.e. a diagonal matrix).
+#'
+#' @param object A `parametric_hrf_fit` object
+#' @param voxel_index Integer vector of voxel indices
+#' @param ... Currently unused
+#' @return A variance-covariance matrix or list of matrices
+#' @export
+vcov.parametric_hrf_fit <- function(object, voxel_index, ...) {
+  if (missing(voxel_index)) {
+    stop("voxel_index must be specified")
+  }
+  if (is.null(object$parameter_ses)) {
+    stop("Variance information not available in fit object")
+  }
+
+  get_one_vcov <- function(v) {
+    se <- object$parameter_ses[v, ]
+    V <- diag(se^2, nrow = length(se))
+    dimnames(V) <- list(object$parameter_names, object$parameter_names)
+    V
+  }
+
+  if (length(voxel_index) == 1) {
+    get_one_vcov(voxel_index)
+  } else {
+    lapply(voxel_index, get_one_vcov)
+  }
+}
+
 #' Plot diagnostics for a parametric_hrf_fit
 #'
 #' Provides multiple visualisations including HRF curves, parameter
