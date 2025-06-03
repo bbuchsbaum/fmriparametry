@@ -7,7 +7,6 @@
 .parametric_engine(
   Y_proj,
   S_target_proj,
-  scan_times,
   hrf_eval_times,
   hrf_interface,
   theta_seed,
@@ -20,8 +19,6 @@
 \item{Y_proj}{Numeric matrix of projected BOLD data (timepoints x voxels)}
 
 \item{S_target_proj}{Numeric matrix of projected stimulus design (timepoints x regressors)}
-
-\item{scan_times}{Numeric vector of scan acquisition times}
 
 \item{hrf_eval_times}{Numeric vector of time points for HRF evaluation}
 

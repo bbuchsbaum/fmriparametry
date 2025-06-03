@@ -93,7 +93,6 @@ timing <- system.time({
   result <- .parametric_engine(
     Y_proj = inputs$Y_proj,
     S_target_proj = inputs$S_target_proj,
-    scan_times = inputs$scan_times,
     hrf_eval_times = inputs$hrf_eval_times,
     hrf_interface = hrf_interface,
     theta_seed = seed_params,
@@ -139,7 +138,6 @@ for (i in seq_along(voxel_counts)) {
     .parametric_engine(
       Y_proj = inputs_subset$Y_proj,
       S_target_proj = inputs_subset$S_target_proj,
-      scan_times = inputs_subset$scan_times,
       hrf_eval_times = inputs_subset$hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = seed_params,

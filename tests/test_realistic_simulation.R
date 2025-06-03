@@ -92,7 +92,6 @@ time_basic <- system.time({
   fit_basic <- .parametric_engine(
     Y_proj = data$Y,
     S_target_proj = data$S,
-    scan_times = seq(0, (nrow(data$Y)-1)*2, by = 2),
     hrf_eval_times = data$t_hrf,
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
@@ -122,7 +121,6 @@ data_clusters <- create_realistic_data(n_time = 150, n_vox = 90, n_clusters = 3,
 fit_clusters <- .parametric_engine(
   Y_proj = data_clusters$Y,
   S_target_proj = data_clusters$S,
-  scan_times = seq(0, (nrow(data_clusters$Y)-1)*2, by = 2),
   hrf_eval_times = data_clusters$t_hrf,
   hrf_interface = hrf_interface,
   theta_seed = c(6, 2.5, 0.35),
@@ -150,7 +148,6 @@ for (i in seq_along(snr_levels)) {
   fit_snr <- .parametric_engine(
     Y_proj = data_snr$Y,
     S_target_proj = data_snr$S,
-    scan_times = seq(0, (nrow(data_snr$Y)-1)*2, by = 2),
     hrf_eval_times = data_snr$t_hrf,
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
@@ -171,7 +168,6 @@ tryCatch({
   fit_short <- .parametric_engine(
     Y_proj = data_short$Y,
     S_target_proj = data_short$S,
-    scan_times = seq(0, 49*2, by = 2),
     hrf_eval_times = data_short$t_hrf,
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
@@ -191,7 +187,6 @@ tryCatch({
   fit_empty <- .parametric_engine(
     Y_proj = Y_noise,
     S_target_proj = S_empty,
-    scan_times = seq(0, 99*2, by = 2),
     hrf_eval_times = seq(0, 30, length.out = 61),
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
@@ -213,7 +208,6 @@ data_iter <- create_realistic_data(n_time = 150, n_vox = 50, snr = 2)
   fit_single <- .parametric_engine(
     Y_proj = data_iter$Y,
     S_target_proj = data_iter$S,
-    scan_times = seq(0, (nrow(data_iter$Y)-1)*2, by = 2),
     hrf_eval_times = data_iter$t_hrf,
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),

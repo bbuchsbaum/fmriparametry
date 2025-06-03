@@ -53,7 +53,6 @@ tryCatch({
   fit_engine <- .parametric_engine(
     Y_proj = Y[, 1:n_test_voxels],
     S_target_proj = S[, 1, drop = FALSE],  # Use first regressor
-    scan_times = seq(0, (nrow(Y)-1)*2, by = 2),
     hrf_eval_times = seq(0, 30, length.out = 61),
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),
@@ -153,7 +152,6 @@ tryCatch({
   fit_recovery <- .parametric_engine(
     Y_proj = test_data$Y,
     S_target_proj = test_data$S,
-    scan_times = seq(0, 99*2, by = 2),
     hrf_eval_times = seq(0, 30, length.out = 61),
     hrf_interface = list(
       hrf_function = .lwu_hrf_function,
@@ -191,7 +189,6 @@ for (n_vox in c(100, 1000)) {
     fit <- .parametric_engine(
       Y_proj = test_data$Y,
       S_target_proj = test_data$S,
-      scan_times = seq(0, 99*2, by = 2),
       hrf_eval_times = seq(0, 30, length.out = 61),
       hrf_interface = list(
         hrf_function = .lwu_hrf_function,

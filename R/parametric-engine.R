@@ -5,7 +5,6 @@
 #'
 #' @param Y_proj Numeric matrix of projected BOLD data (timepoints x voxels)
 #' @param S_target_proj Numeric matrix of projected stimulus design (timepoints x regressors)
-#' @param scan_times Numeric vector of scan acquisition times
 #' @param hrf_eval_times Numeric vector of time points for HRF evaluation
 #' @param hrf_interface List with HRF function interface
 #' @param theta_seed Numeric vector of starting parameters
@@ -23,7 +22,6 @@
 .parametric_engine <- function(
   Y_proj,
   S_target_proj,
-  scan_times,
   hrf_eval_times,
   hrf_interface,
   theta_seed,

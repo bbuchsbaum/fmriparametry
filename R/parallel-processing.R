@@ -281,7 +281,6 @@
     local_res <- .parametric_engine(
       Y_proj = prepared_data$Y_proj[, v, drop = FALSE],
       S_target_proj = prepared_data$S_target_proj,
-      scan_times = prepared_data$scan_times,
       hrf_eval_times = prepared_data$hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = theta_local,
