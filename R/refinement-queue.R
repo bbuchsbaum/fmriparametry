@@ -54,9 +54,9 @@
   # Calculate SE metrics if available
   se_metric <- NULL
   if (!is.null(se_theta_hat_voxel)) {
-    # Use average relative SE across parameters as metric
-    # Relative SE = SE / |parameter estimate|
-    # This is more meaningful than absolute SE
+    # Use average absolute SE across parameters as the metric
+    # se_theta_hat_voxel is expected to contain standard errors for each
+    # parameter, so we take the mean across parameters per voxel
     se_metric <- rowMeans(se_theta_hat_voxel, na.rm = TRUE)
     
     # Cap extreme values

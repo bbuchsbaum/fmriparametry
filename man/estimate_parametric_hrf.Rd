@@ -24,7 +24,7 @@ estimate_parametric_hrf(
   kmeans_passes = 2,
   tiered_refinement = c("none", "moderate", "aggressive"),
   refinement_thresholds = list(r2_easy = 0.7, r2_hard = 0.3, se_low = 0.3, se_high = 0.7,
-    local_radius = 26, gauss_newton_maxiter = 10),
+    gauss_newton_maxiter = 10),
   parallel = FALSE,
   n_cores = NULL,
   compute_se = TRUE,
