@@ -161,7 +161,17 @@
           break
         }
       }
-      
+
+      # Check if line search produced an update
+      if (all(theta_new == theta_current)) {
+        if (alpha < 1e-6) {
+          convergence_status[i] <- "line_search_failed"
+          break
+        } else {
+          next
+        }
+      }
+
       # Check convergence
       param_change <- sqrt(sum((theta_new - theta_current)^2))
       obj_change <- abs(obj_new - obj_current) / (abs(obj_current) + 1e-10)
