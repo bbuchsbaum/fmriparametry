@@ -240,8 +240,8 @@
     convergence_status = convergence_status,
     iteration_counts = iteration_counts,
     improvement_summary = list(
-      mean_r2_improvement = mean(r2_voxel[idx_hard] - r2_orig[idx_hard]),
-      max_r2_improvement = max(r2_voxel[idx_hard] - r2_orig[idx_hard])
+      mean_r2_improvement = mean(r2_voxel[idx_hard] - r2_orig[idx_hard], na.rm = TRUE),
+      max_r2_improvement = max(r2_voxel[idx_hard] - r2_orig[idx_hard], na.rm = TRUE)
     )
   )
 }
