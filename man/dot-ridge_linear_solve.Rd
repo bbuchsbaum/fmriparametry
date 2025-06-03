@@ -11,7 +11,7 @@
 
 \item{Y}{Response matrix (time x voxels)}
 
-\item{lambda_ridge}{Ridge penalty}
+\item{lambda_ridge}{Non-negative numeric ridge penalty (scalar)}
 }
 \description{
 Fast ridge regression solver using RcppEigen and OpenMP
