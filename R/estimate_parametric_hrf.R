@@ -482,7 +482,7 @@ estimate_parametric_hrf <- function(
         theta_bounds = theta_bounds,
         local_radius = refinement_thresholds$local_radius,
         parallel = parallel,
-        parallel_config = parallel_config
+        n_cores = if (parallel) parallel_config$n_cores else 1
       )
       
       # Update results
@@ -507,7 +507,7 @@ estimate_parametric_hrf <- function(
         theta_bounds = theta_bounds,
         max_iter = refinement_thresholds$gauss_newton_maxiter,
         parallel = parallel,
-        parallel_config = parallel_config
+        n_cores = if (parallel) parallel_config$n_cores else 1
       )
       
       # Update results
