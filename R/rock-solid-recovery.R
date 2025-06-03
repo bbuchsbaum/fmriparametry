@@ -129,7 +129,6 @@
       basic_result <- .parametric_engine(
         Y_proj = Y_proj,
         S_target_proj = S_target_proj,
-        scan_times = seq_len(nrow(Y_proj)),
         hrf_eval_times = seq(0, 30, by = 0.5),
         hrf_interface = hrf_interface,
         theta_seed = theta_seed,

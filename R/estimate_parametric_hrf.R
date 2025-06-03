@@ -290,7 +290,6 @@ estimate_parametric_hrf <- function(
     core_result <- process_function(
       Y_proj = inputs$Y_proj,
       S_target_proj = inputs$S_target_proj,
-      scan_times = inputs$scan_times,
       hrf_eval_times = inputs$hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = theta_seed,
@@ -302,7 +301,6 @@ estimate_parametric_hrf <- function(
     core_result <- process_function(
       Y_proj = inputs$Y_proj,
       S_target_proj = inputs$S_target_proj,
-      scan_times = inputs$scan_times,
       hrf_eval_times = inputs$hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = theta_seed,
@@ -375,7 +373,6 @@ estimate_parametric_hrf <- function(
         iter_result <- process_function(
           Y_proj = inputs$Y_proj,
           S_target_proj = inputs$S_target_proj,
-          scan_times = inputs$scan_times,
           hrf_eval_times = inputs$hrf_eval_times,
           hrf_interface = hrf_interface,
           theta_seed = theta_center,
@@ -387,7 +384,6 @@ estimate_parametric_hrf <- function(
         iter_result <- process_function(
           Y_proj = inputs$Y_proj,
           S_target_proj = inputs$S_target_proj,
-          scan_times = inputs$scan_times,
           hrf_eval_times = inputs$hrf_eval_times,
           hrf_interface = hrf_interface,
           theta_seed = theta_center,
@@ -701,7 +697,7 @@ estimate_parametric_hrf <- function(
 
 # MISSING FUNCTION 1: Parallel engine
 
-.parametric_engine_parallel <- function(Y_proj, S_target_proj, scan_times, hrf_eval_times,
+.parametric_engine_parallel <- function(Y_proj, S_target_proj, hrf_eval_times,
                                        hrf_interface, theta_seed, theta_bounds,
                                        lambda_ridge = 0.01, parallel_config,
                                        epsilon_beta = 1e-6) {
@@ -714,7 +710,6 @@ estimate_parametric_hrf <- function(
     res <- .parametric_engine(
       Y_proj = Y_proj[, voxel_idx, drop = FALSE],
       S_target_proj = S_target_proj,
-      scan_times = scan_times,
       hrf_eval_times = hrf_eval_times,
       hrf_interface = hrf_interface,
       theta_seed = theta_seed,

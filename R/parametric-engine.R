@@ -5,7 +5,6 @@
 #'
 #' @param Y_proj Numeric matrix of projected BOLD data (timepoints x voxels)
 #' @param S_target_proj Numeric matrix of projected stimulus design (timepoints x regressors)
-#' @param scan_times Numeric vector of scan acquisition times
 #' @param hrf_eval_times Numeric vector of time points for HRF evaluation
 #' @param hrf_interface List with HRF function interface
 #' @param theta_seed Numeric vector of starting parameters
@@ -13,6 +12,11 @@
 #' @param lambda_ridge Numeric ridge penalty (default: 0.01)
 #' @param epsilon_beta Small value to avoid division by zero when beta0 is extremely small (default: 1e-6)
 #' @param verbose Logical whether to print progress (default: FALSE)
+#'
+#' @note
+#' This engine assumes evenly spaced scan times (constant TR).
+#' If acquisition times vary, adjust the stimulus design or
+#' interpolate the data before calling this function.
 #'
 #' @return List with elements:
 #'   - `theta_hat`: Matrix of parameter estimates (voxels x parameters)
@@ -24,7 +28,6 @@
 .parametric_engine <- function(
   Y_proj,
   S_target_proj,
-  scan_times,
   hrf_eval_times,
   hrf_interface,
   theta_seed,

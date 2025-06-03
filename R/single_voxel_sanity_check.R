@@ -38,7 +38,6 @@ single_voxel_sanity_check <- function(
   .parametric_engine(
     Y_proj = Y,
     S_target_proj = S,
-    scan_times = seq_len(length(y)),
     hrf_eval_times = hrf_eval_times,
     hrf_interface = hrf_interface,
     theta_seed = theta_seed,

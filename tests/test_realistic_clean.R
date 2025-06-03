@@ -53,7 +53,6 @@ test_basic_recovery <- function() {
     fit <- .parametric_engine(
       Y_proj = Y,
       S_target_proj = S,
-      scan_times = seq(0, (n_time-1)*2, by = 2),
       hrf_eval_times = t_hrf,
       hrf_interface = hrf_interface,
       theta_seed = c(6, 2.5, 0.35),
@@ -111,7 +110,6 @@ tryCatch({
   fit_empty <- .parametric_engine(
     Y_proj = Y_noise,
     S_target_proj = S_empty,
-    scan_times = seq(0, 49*2, by = 2),
     hrf_eval_times = seq(0, 30, length.out = 61),
     hrf_interface = list(
       hrf_function = .lwu_hrf_function,
@@ -138,7 +136,6 @@ tryCatch({
   fit_single <- .parametric_engine(
     Y_proj = Y_single,
     S_target_proj = S_single,
-    scan_times = seq(0, 99*2, by = 2),
     hrf_eval_times = seq(0, 30, length.out = 61),
     hrf_interface = list(
       hrf_function = .lwu_hrf_function,
@@ -167,7 +164,6 @@ for (n_vox in voxel_counts) {
     fit_bench <- .parametric_engine(
       Y_proj = Y_bench,
       S_target_proj = S_bench,
-      scan_times = seq(0, 99*2, by = 2),
       hrf_eval_times = seq(0, 30, length.out = 61),
       hrf_interface = list(
         hrf_function = .lwu_hrf_function,

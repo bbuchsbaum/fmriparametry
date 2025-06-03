@@ -36,7 +36,6 @@ tryCatch({
   fit <- .parametric_engine(
     Y_proj = Y,
     S_target_proj = S,
-    scan_times = seq(0, (n_time-1)*2, by = 2),
     hrf_eval_times = t_hrf,
     hrf_interface = hrf_interface,
     theta_seed = c(6, 2.5, 0.35),

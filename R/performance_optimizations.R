@@ -94,11 +94,16 @@
     # Load only current chunk
     Y_chunk <- load_fmri_chunk(fmri_file, start_idx, end_idx)
     
-    # Process chunk
+    # Process chunk using default seed and evaluation grid
     result_chunk <- .parametric_engine(
       Y_proj = Y_chunk,
       S_target_proj = event_design,
-      hrf_interface = hrf_interface
+      hrf_eval_times = seq(0, 30, by = 0.5),
+      hrf_interface = hrf_interface,
+      theta_seed = hrf_interface$default_seed(),
+      theta_bounds = hrf_interface$default_bounds(),
+      lambda_ridge = 0.01,
+      verbose = FALSE
     )
     
     # Store results directly to disk
