@@ -2,12 +2,17 @@
 #'
 #' Estimate hemodynamic response function parameters from fMRI time series using
 #' a parametric HRF model. Optional refinement steps improve fits for challenging
-#' voxels.
+#' voxels. The core engine performs a single Taylor approximation pass around
+#' the provided parameter seed. Additional stages can iteratively update this
+#' seed and apply specialized refinement algorithms.
 #' 
 #' @section Package Options:
 #' Global iterative refinement (Stage 3) is controlled by the option
 #' `fmriparametric.refine_global`. Set to `FALSE` to disable global re-centering
 #' for all calls.
+#'
+#' @section Iteration and Convergence:
+#' The core engine runs a single Taylor pass around `theta_seed`. If `global_refinement = TRUE`, the seed is updated for up to `global_passes` iterations until the maximum parameter change is below `convergence_epsilon`. K-means initialization can provide alternative seeds before this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization with its own iteration limits (e.g. `refinement_thresholds$gauss_newton_maxiter`).
 #'
 #' @param fmri_data An fMRI dataset object or numeric matrix (timepoints x voxels)
 #' @param event_model Event timing design matrix or event model object
@@ -46,6 +51,7 @@
 #'   - standard_errors: Parameter standard errors (if computed)
 #'   - fit_quality: List with R-squared and other metrics
 #'   - convergence_info: Detailed convergence information
+#'     Convergence summaries include global iteration counts and, when tiered refinement is used, Gauss-Newton statistics.
 #'   - refinement_info: Information about refinement strategies applied
 #'   - metadata: Complete analysis metadata
 #'
@@ -249,6 +255,7 @@ estimate_parametric_hrf <- function(
   }
   
   # K-means initialization if requested
+  kmeans_iterations <- 0
   if (kmeans_refinement && kmeans_k > 1) {
     if (verbose) cat("  Performing K-means clustering for initialization...\n")
     kmeans_result <- .perform_kmeans_initialization(
@@ -258,6 +265,7 @@ estimate_parametric_hrf <- function(
       hrf_interface = hrf_interface,
       theta_bounds = theta_bounds
     )
+    kmeans_iterations <- kmeans_result$iterations
     # Update seeds based on clusters
     for (k in seq_len(kmeans_k)) {
       cluster_voxels <- which(kmeans_result$cluster == k)
@@ -328,7 +336,7 @@ estimate_parametric_hrf <- function(
   }
   
   # ========== STAGE 3: ITERATIVE REFINEMENT ==========
-  convergence_info <- list()
+  convergence_info <- list(global_iterations = 0, converged = TRUE)
 
   use_global_refinement <- isTRUE(getOption("fmriparametric.refine_global", TRUE))
 
@@ -338,8 +346,11 @@ estimate_parametric_hrf <- function(
     best_theta <- theta_current
     best_amplitudes <- amplitudes
     best_r2 <- mean(r_squared)
+    global_iter_count <- 0
+    global_converged <- FALSE
 
     for (iter in seq_len(global_passes)) {
+      global_iter_count <- iter
       if (verbose) cat(sprintf("  Iteration %d/%d: ", iter, global_passes))
 
       # Store previous parameters
@@ -456,6 +467,7 @@ estimate_parametric_hrf <- function(
 
         if (max_change < convergence_epsilon) {
           if (verbose) cat("  ✓ Converged!\n")
+          global_converged <- TRUE
           break
         }
       }
@@ -463,6 +475,8 @@ estimate_parametric_hrf <- function(
 
     theta_current <- best_theta
     amplitudes <- best_amplitudes
+    convergence_info$global_iterations <- global_iter_count
+    convergence_info$converged <- global_converged
   }
   
   # ========== STAGE 4: TIERED REFINEMENT ==========
@@ -556,6 +570,14 @@ estimate_parametric_hrf <- function(
       theta_current[hard_idx, ] <- hard_result$theta_refined
       amplitudes[hard_idx] <- hard_result$amplitudes
       refinement_info$hard_refined <- length(hard_idx)
+      refinement_info$n_converged <- hard_result$gn_info$n_converged
+      refinement_info$n_improved <- hard_result$gn_info$n_improved
+      convergence_info$gauss_newton <- list(
+        n_hard = length(hard_idx),
+        n_converged = hard_result$gn_info$n_converged,
+        n_improved = hard_result$gn_info$n_improved,
+        mean_iterations = mean(hard_result$gn_info$iteration_counts)
+      )
     }
     
     # Recompute final R-squared after refinement
@@ -638,7 +660,12 @@ estimate_parametric_hrf <- function(
       total_seconds = total_time,
       voxels_per_second = n_vox / total_time
     ),
-    version = "ultimate_impeccable_v1.0"
+    version = "ultimate_impeccable_v1.0",
+    kmeans_info = list(
+      applied = kmeans_refinement && kmeans_k > 1,
+      n_clusters = kmeans_k,
+      total_iterations = kmeans_iterations
+    )
   )
 
   # Clean up parallel backend
@@ -921,7 +948,7 @@ estimate_parametric_hrf <- function(
   }
   centers[, 1] <- pmax(bounds$lower[1], pmin(bounds$upper[1], centers[, 1]))
 
-  list(cluster = km$cluster, centers = centers)
+  list(cluster = km$cluster, centers = centers, iterations = km$iter)
 }
 
 .compute_r_squared <- function(Y, Y_pred) {
@@ -1065,6 +1092,15 @@ estimate_parametric_hrf <- function(
 
   amps <- vapply(voxel_idx, amp_fun, numeric(1))
 
-  list(theta_refined = theta_updated[voxel_idx, , drop = FALSE],
-       amplitudes = amps)
+  list(
+    theta_refined = theta_updated[voxel_idx, , drop = FALSE],
+    amplitudes = amps,
+    gn_info = list(
+      n_refined = gn$n_refined,
+      n_converged = gn$n_converged,
+      n_improved = gn$n_improved,
+      convergence_status = gn$convergence_status,
+      iteration_counts = gn$iteration_counts
+    )
+  )
 }

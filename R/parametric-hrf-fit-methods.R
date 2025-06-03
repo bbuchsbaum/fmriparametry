@@ -67,6 +67,11 @@ print.parametric_hrf_fit <- function(x, ...) {
       cat("  K-means clusters:", x$metadata$kmeans_info$n_clusters, "\n")
       cat("  K-means iterations:", x$metadata$kmeans_info$total_iterations, "\n")
     }
+    if (!is.null(x$convergence_info$gauss_newton)) {
+      gn <- x$convergence_info$gauss_newton
+      cat("  Gauss-Newton mean iterations:", round(gn$mean_iterations, 1), "\n")
+      cat("  Hard voxels converged:", gn$n_converged, "/", gn$n_hard, "\n")
+    }
   }
 
   if (!is.null(x$metadata$parallel_info)) {
