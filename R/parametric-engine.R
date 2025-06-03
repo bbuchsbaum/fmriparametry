@@ -49,6 +49,16 @@
   n_vox    <- ncol(Y_proj)
   n_params <- length(theta_seed)
 
+  if (nrow(S_target_proj) != n_time) {
+    stop(
+      sprintf(
+        "S_target_proj has %d rows but expected %d to match Y_proj",
+        nrow(S_target_proj), n_time
+      ),
+      call. = FALSE
+    )
+  }
+
   if (verbose) {
     cat("Parametric engine: ", n_vox, " voxels, ", n_params,
         " parameters\n", sep = "")
