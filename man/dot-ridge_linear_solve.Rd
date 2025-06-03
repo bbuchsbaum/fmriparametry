@@ -15,5 +15,6 @@
 }
 \description{
 Fast ridge regression solver using RcppEigen and OpenMP
+\cr Error if non-finite values are detected in the inputs.
 }
 \keyword{internal}

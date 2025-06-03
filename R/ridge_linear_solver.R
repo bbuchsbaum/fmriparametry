@@ -21,6 +21,22 @@
     stop("Y is NULL or empty in .ridge_linear_solve")
   }
   
+
+  # Ensure lambda is numeric
+  if (!is.numeric(lambda_ridge) || length(lambda_ridge) != 1) {
+    stop("lambda_ridge must be a single numeric value")
+  }
+
+  # Dimension checks
+  if (nrow(X) != nrow(Y)) {
+    stop("X and Y must have the same number of rows")
+  }
+
+  # Non-finite value checks
+  if (any(!is.finite(X))) stop("X contains non-finite values")
+  if (any(!is.finite(Y))) stop("Y contains non-finite values")
+
+
   # Validate ridge penalty
   lambda_ridge <- .validate_numeric_param(
     lambda_ridge, "lambda_ridge",
@@ -28,5 +44,6 @@
     caller = ".ridge_linear_solve"
   )
   
+
   ridge_linear_solve_cpp(X, Y, lambda_ridge)
 }
