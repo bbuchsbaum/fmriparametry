@@ -11,7 +11,10 @@
 #' @return List containing:
 #'   - queue_labels: Character vector of queue assignments
 #'   - queue_summary: Summary statistics for each queue
+#'   - queue_proportions: Proportion of voxels in each queue
+#'   - queue_details: Detailed metrics for each queue
 #'   - refinement_needed: Logical indicating if any refinement is needed
+#'   - classification_criteria: Thresholds used for classification
 #' @keywords internal
 .classify_refinement_queue <- function(
   r2_voxel,
@@ -35,10 +38,15 @@
   queue_labels <- rep("easy", n_vox)
   
   if (!refinement_opts$apply_refinement) {
+    queue_summary <- table(queue_labels)
+    queue_proportions <- prop.table(queue_summary)
     return(list(
       queue_labels = queue_labels,
-      queue_summary = table(queue_labels),
-      refinement_needed = FALSE
+      queue_summary = queue_summary,
+      queue_proportions = queue_proportions,
+      queue_details = list(),
+      refinement_needed = FALSE,
+      classification_criteria = NULL
     ))
   }
   
@@ -51,9 +59,9 @@
   # Calculate SE metrics if available
   se_metric <- NULL
   if (!is.null(se_theta_hat_voxel)) {
-    # Use average relative SE across parameters as metric
-    # Relative SE = SE / |parameter estimate|
-    # This is more meaningful than absolute SE
+    # Use average absolute SE across parameters as the metric
+    # se_theta_hat_voxel is expected to contain standard errors for each
+    # parameter, so we take the mean across parameters per voxel
     se_metric <- rowMeans(se_theta_hat_voxel, na.rm = TRUE)
     
     # Cap extreme values

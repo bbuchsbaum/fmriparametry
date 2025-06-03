@@ -86,12 +86,19 @@
     
     # Calculate initial objective
     obj_current <- .calculate_objective_gn(
-      theta_current, y_v, S_target_proj, hrf_eval_times, 
+      theta_current, y_v, S_target_proj, hrf_eval_times,
       hrf_interface, n_time
     )
+
+    if (is.infinite(obj_current)) {
+      convergence_status[i] <- "singular_system"
+      iteration_counts[i] <- 0
+      next
+    }
     
     converged <- FALSE
     iter <- 0
+    singular <- FALSE
     
     # Gauss-Newton iterations
     for (iter in seq_len(max_iter_gn)) {
@@ -146,6 +153,12 @@
           theta_proposal, y_v, S_target_proj, hrf_eval_times,
           hrf_interface, n_time
         )
+
+        if (is.infinite(obj_proposal)) {
+          convergence_status[i] <- "singular_system"
+          singular <- TRUE
+          break
+        }
         
         # Accept if improved
         if (obj_proposal < obj_current) {
@@ -161,7 +174,21 @@
           break
         }
       }
+
+      if (singular) {
+        break
+      }
       
+      # Check if line search produced an update
+      if (all(theta_new == theta_current)) {
+        if (alpha < 1e-6) {
+          convergence_status[i] <- "line_search_failed"
+          break
+        } else {
+          next
+        }
+      }
+
       # Check convergence
       param_change <- sqrt(sum((theta_new - theta_current)^2))
       obj_change <- abs(obj_new - obj_current) / (abs(obj_current) + 1e-10)
@@ -247,24 +274,38 @@
 }
 
 #' Calculate objective function for Gauss-Newton
+#'
+#' Returns `Inf` if the HRF predictor has near-zero magnitude, which
+#' indicates that the system is singular and the amplitude cannot be
+#' estimated reliably.
+#'
 #' @keywords internal
 .calculate_objective_gn <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
   # Generate HRF at current parameters
   hrf_vals <- hrf_interface$hrf_function(t_hrf, theta)
-  
+
   # Convolve with stimulus
   conv_full <- stats::convolve(S[, 1], rev(hrf_vals), type = "open")
   x_pred_raw <- conv_full[seq_len(n_time)]
-  
+
+  denom <- sum(x_pred_raw^2)
+  if (denom < 1e-8) {
+    return(Inf)
+  }
+
   # Fit amplitude analytically
-  beta <- sum(x_pred_raw * y) / sum(x_pred_raw^2)
+  beta <- sum(x_pred_raw * y) / denom
   x_pred <- beta * x_pred_raw
-  
+
   # Return sum of squared residuals
   sum((y - x_pred)^2)
 }
 
 #' Get Jacobian matrix and residuals for Gauss-Newton
+#'
+#' Returns `NULL` if the HRF predictor has near-zero magnitude, which
+#' indicates a singular system.
+#'
 #' @keywords internal
 .get_jacobian_and_residuals <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
   n_params <- length(theta)
@@ -284,11 +325,13 @@
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]
-  denom_amp <- sum(x_hrf^2)
-  if (denom_amp < 1e-8) {
+
+  denom <- sum(x_hrf^2)
+  if (denom < 1e-8) {
     return(NULL)
   }
-  beta <- sum(x_hrf * y) / denom_amp
+  beta <- sum(x_hrf * y) / denom
+
   
   # Residuals
   residuals <- y - beta * x_hrf
@@ -301,9 +344,7 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
-    denom <- denom_amp
-    num <- sum(dx_dtheta_k * y) - 2 * beta * sum(dx_dtheta_k * x_hrf)
-    dbeta_dtheta_k <- num / denom
+    dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / denom
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf
