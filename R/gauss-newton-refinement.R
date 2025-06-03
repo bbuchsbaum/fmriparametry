@@ -294,11 +294,7 @@
   }
 
   # Fit amplitude analytically
-##<<<<<<< codex/optimize-calculations-with-crossprod
-  beta <- as.numeric(crossprod(x_pred_raw, y)) / sum(x_pred_raw^2)
-##=======
-  beta <- sum(x_pred_raw * y) / denom
-##>>>>>>> main
+  beta <- as.numeric(crossprod(x_pred_raw, y)) / denom
   x_pred <- beta * x_pred_raw
 
   # Return sum of squared residuals
@@ -329,17 +325,11 @@
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]
-##<<<<<<< codex/optimize-calculations-with-crossprod
-  beta <- as.numeric(crossprod(x_hrf, y)) / sum(x_hrf^2)
-##=======
-
   denom <- sum(x_hrf^2)
   if (denom < 1e-8) {
     return(NULL)
   }
-  beta <- sum(x_hrf * y) / denom
-
-##>>>>>>> main
+  beta <- as.numeric(crossprod(x_hrf, y)) / denom
   
   # Residuals
   residuals <- y - beta * x_hrf
@@ -352,12 +342,8 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
-##<<<<<<< codex/optimize-calculations-with-crossprod
     dbeta_dtheta_k <- (as.numeric(crossprod(dx_dtheta_k, y)) -
-      beta * as.numeric(crossprod(dx_dtheta_k, x_hrf))) / sum(x_hrf^2)
-##=======
-    dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / denom
-##>>>>>>> main
+      beta * as.numeric(crossprod(dx_dtheta_k, x_hrf))) / denom
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf
