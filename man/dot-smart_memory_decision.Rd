@@ -18,5 +18,6 @@ List with chunking recommendation
 }
 \description{
 Decides whether to use chunked processing based on memory constraints
-and dataset size.
+and dataset size. If memory detection fails or \code{memory_limit} is
+\code{NA}, an 8GB limit is assumed.
 }

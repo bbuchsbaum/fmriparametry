@@ -179,6 +179,16 @@
         break
       }
       
+      # Check if line search produced an update
+      if (all(theta_new == theta_current)) {
+        if (alpha < 1e-6) {
+          convergence_status[i] <- "line_search_failed"
+          break
+        } else {
+          next
+        }
+      }
+
       # Check convergence
       param_change <- sqrt(sum((theta_new - theta_current)^2))
       obj_change <- abs(obj_new - obj_current) / (abs(obj_current) + 1e-10)
@@ -257,8 +267,8 @@
     convergence_status = convergence_status,
     iteration_counts = iteration_counts,
     improvement_summary = list(
-      mean_r2_improvement = mean(r2_voxel[idx_hard] - r2_orig[idx_hard]),
-      max_r2_improvement = max(r2_voxel[idx_hard] - r2_orig[idx_hard])
+      mean_r2_improvement = mean(r2_voxel[idx_hard] - r2_orig[idx_hard], na.rm = TRUE),
+      max_r2_improvement = max(r2_voxel[idx_hard] - r2_orig[idx_hard], na.rm = TRUE)
     )
   )
 }
@@ -315,11 +325,13 @@
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]
+
   denom <- sum(x_hrf^2)
   if (denom < 1e-8) {
     return(NULL)
   }
   beta <- sum(x_hrf * y) / denom
+
   
   # Residuals
   residuals <- y - beta * x_hrf
@@ -332,7 +344,13 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
+##<<<<<<< codex/add-tolerance-check-for-division-in-calculate_objective_gn-a
     dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / denom
+##=======
+    denom <- denom_amp
+    num <- sum(dx_dtheta_k * y) - 2 * beta * sum(dx_dtheta_k * x_hrf)
+    dbeta_dtheta_k <- num / denom
+##>>>>>>> main
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf

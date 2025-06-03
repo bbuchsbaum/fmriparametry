@@ -13,6 +13,7 @@
   theta_seed,
   theta_bounds,
   lambda_ridge = 0.01,
+  epsilon_beta = 1e-06,
   verbose = FALSE
 )
 }
@@ -32,6 +33,8 @@
 \item{theta_bounds}{List with elements \code{lower} and \code{upper}}
 
 \item{lambda_ridge}{Numeric ridge penalty (default: 0.01)}
+
+\item{epsilon_beta}{Small value to avoid division by zero when beta0 is extremely small (default: 1e-06)}
 
 \item{verbose}{Logical whether to print progress (default: FALSE)}
 }

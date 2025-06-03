@@ -206,10 +206,12 @@
 #' @param S_target_proj Design matrix
 #' @param profiling_fraction Fraction of data to use for profiling
 #' @return List with optimal algorithm and estimated performance
+#' @details When profiling parallel performance this function uses
+#'   \code{parallel::parLapply} on Windows and \code{parallel::mclapply}
+#'   elsewhere.
 .adaptive_algorithm_selection <- function(Y_proj, S_target_proj, profiling_fraction = 0.1) {
   
   n_vox <- ncol(Y_proj)
-  n_time <- nrow(Y_proj)
   
   # Quick heuristics for small problems
   if (n_vox < 100) {
@@ -247,10 +249,18 @@
     algorithms$parallel <- system.time({
       # Simplified parallel test
       chunk_size <- ceiling(n_profile / 2)
-      chunks <- list(1:chunk_size, (chunk_size+1):n_profile)
-      parallel::mclapply(chunks, function(idx) {
-        qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
-      }, mc.cores = 2)
+      chunks <- list(1:chunk_size, (chunk_size + 1):n_profile)
+      if (.Platform$OS.type == "windows") {
+        cl <- parallel::makeCluster(min(2, n_cores))
+        on.exit(parallel::stopCluster(cl), add = TRUE)
+        parallel::parLapply(cl, chunks, function(idx) {
+          qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
+        })
+      } else {
+        parallel::mclapply(chunks, function(idx) {
+          qr.solve(qr(S_target_proj), Y_profile[, idx, drop = FALSE])
+        }, mc.cores = min(2, n_cores))
+      }
     })["elapsed"]
   }
   
