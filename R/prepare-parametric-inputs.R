@@ -29,10 +29,9 @@
   } else if (requireNamespace("fmrireg", quietly = TRUE) &&
              inherits(fmri_data, c("fmri_dataset", "matrix_dataset"))) {
     Y_raw <- fmrireg::get_data_matrix(fmri_data, mask = mask)
-    scan_times <- fmrireg::scan_times(fmri_data)
-    if (is.null(scan_times)) {
-      scan_times <- seq_len(nrow(Y_raw))
-    }
+    # Extract scan times - matrix_dataset doesn't have a sampling_frame
+    # so we'll use the number of rows
+    scan_times <- seq_len(nrow(Y_raw))
   } else if (is.list(fmri_data) && !is.null(fmri_data$data)) {
     Y_raw <- fmri_data$data
     scan_times <- fmri_data$scan_times
@@ -53,7 +52,7 @@
     S_target <- event_model
   } else if (requireNamespace("fmrireg", quietly = TRUE) &&
              inherits(event_model, "event_model")) {
-    S_target <- fmrireg::design_matrix(event_model)
+    S_target <- as.matrix(fmrireg::design_matrix(event_model))
   } else if (is.list(event_model) && !is.null(event_model$design_matrix)) {
     S_target <- event_model$design_matrix
   } else {
@@ -61,6 +60,11 @@
   }
   if (nrow(S_target) != length(scan_times)) {
     stop("event_model design matrix has wrong number of rows", call. = FALSE)
+  }
+  
+  # Check if design matrix has any events
+  if (all(S_target == 0)) {
+    warning("No events detected in event_model", call. = FALSE)
   }
 
   # Step 3: confound matrix

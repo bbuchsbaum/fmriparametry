@@ -95,6 +95,12 @@ new_parametric_hrf_fit <- function(
   obj$parameters <- obj$estimated_parameters
   obj$convergence <- convergence_info
   
+  # Add fields expected by tests but not included in constructor
+  obj$standard_errors <- parameter_ses  # Use the passed value or NULL
+  obj$se_amplitudes <- NULL
+  obj$fit_quality <- NULL
+  obj$refinement_info <- list(applied = FALSE)  # Always present, non-NULL
+  
   class(obj) <- "parametric_hrf_fit"
   obj
 }

@@ -42,6 +42,8 @@
 #' @importFrom grDevices rainbow rgb
 #' @importFrom graphics abline hist legend lines mtext par
 #' @importFrom utils head memory.size sessionInfo tail
+#' @importFrom digest digest
+#' @useDynLib fmriparametric, .registration = TRUE
 #'
 #' @examples
 #' \dontrun{

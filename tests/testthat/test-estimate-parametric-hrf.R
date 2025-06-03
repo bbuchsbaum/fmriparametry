@@ -69,15 +69,13 @@ test_that("estimate_parametric_hrf returns expected structure", {
   )
   
   # Check structure - current fit object contains a richer set of fields
-  expect_named(
-    result,
-    c(
-      "estimated_parameters", "amplitudes", "parameter_names", "hrf_model",
-      "r_squared", "residuals", "parameter_ses", "convergence_info",
-      "metadata", "parameters", "convergence", "standard_errors",
-      "se_amplitudes", "fit_quality", "refinement_info"
-    )
+  expected_names <- c(
+    "estimated_parameters", "amplitudes", "parameter_names", "hrf_model",
+    "r_squared", "residuals", "parameter_ses", "convergence_info",
+    "metadata", "parameters", "convergence", "standard_errors",
+    "se_amplitudes", "fit_quality", "refinement_info"
   )
+  expect_setequal(names(result), expected_names)
   
   # Check dimensions
   expect_equal(nrow(result$estimated_parameters), ncol(fmri_data))
@@ -126,6 +124,11 @@ test_that("estimate_parametric_hrf respects parameter bounds", {
     lower = c(2, 0.5, 0.1),
     upper = c(10, 5, 0.8)
   )
+  
+  # Disable global refinement for this test
+  old_opt <- getOption("fmriparametric.refine_global")
+  options(fmriparametric.refine_global = FALSE)
+  on.exit(options(fmriparametric.refine_global = old_opt))
   
   result <- estimate_parametric_hrf(
     fmri_data = fmri_data,

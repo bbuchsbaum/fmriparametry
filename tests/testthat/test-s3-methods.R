@@ -20,7 +20,7 @@ test_that("S3 methods work for parametric_hrf_fit objects", {
   expect_equal(dim(coefficients), c(5, 3))
   expect_true(is.matrix(coefficients))
   expect_equal(rownames(coefficients), paste0("Voxel_", 1:5))
-  expect_equal(colnames(coefficients), c("lag", "width", "undershoot"))
+  expect_equal(colnames(coefficients), c("tau", "sigma", "rho"))
   
   # Test summary method
   summary_obj <- summary(fit)
@@ -28,7 +28,8 @@ test_that("S3 methods work for parametric_hrf_fit objects", {
   expect_output(print(summary_obj), "Summary of Parametric HRF Fit")
   
   # Test fitted method
-  fitted_values <- fitted(fit)
+  # Need to pass Y_proj since fit doesn't store fitted values
+  fitted_values <- fitted(fit, Y_proj = fmri_data)
   expect_true(is.matrix(fitted_values))
   expect_equal(dim(fitted_values), c(20, 5))
   

@@ -95,7 +95,7 @@
 
   list(
     theta_hat = theta_hat,
-    beta0 = as.numeric(beta0),
+    beta0 = if(is.matrix(beta0)) beta0 else matrix(beta0, ncol = 1),
     r_squared = as.numeric(r_squared),
     residuals = residuals,
     coeffs = coeffs

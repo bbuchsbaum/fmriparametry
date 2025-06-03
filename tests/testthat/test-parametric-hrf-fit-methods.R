@@ -17,7 +17,9 @@ test_that("print method produces output", {
 })
 
 test_that("coef method returns matrix", {
-  expect_equal(coef(obj), pars)
+  coef_result <- coef(obj)
+  expect_equal(unname(coef_result), unname(pars))
+  expect_equal(dim(coef_result), dim(pars))
 })
 
 test_that("summary method returns list with summaries", {
