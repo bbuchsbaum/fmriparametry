@@ -25,6 +25,15 @@
   if (!is.numeric(lambda_ridge) || length(lambda_ridge) != 1) {
     stop("lambda_ridge must be a single numeric value")
   }
-  
+
+  # Dimension checks
+  if (nrow(X) != nrow(Y)) {
+    stop("X and Y must have the same number of rows")
+  }
+
+  # Non-finite value checks
+  if (any(!is.finite(X))) stop("X contains non-finite values")
+  if (any(!is.finite(Y))) stop("Y contains non-finite values")
+
   ridge_linear_solve_cpp(X, Y, lambda_ridge)
 }
