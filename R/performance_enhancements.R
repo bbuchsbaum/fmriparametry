@@ -79,10 +79,17 @@
 #' @param fmri_data Large fMRI dataset (can be file path or matrix)
 #' @param process_function Function to apply to each chunk
 #' @param chunk_size Number of voxels per chunk
+#' @param combine_fun Function used to combine the chunk results
+#'   (defaults to \code{cbind})
 #' @param progress Show progress bar?
 #' @return Combined results across all chunks
-.chunked_processing <- function(fmri_data, process_function, chunk_size = 1000, 
+.chunked_processing <- function(fmri_data, process_function, chunk_size = 1000,
+                               combine_fun = cbind,
                                progress = TRUE, ...) {
+
+  if (!is.numeric(chunk_size) || chunk_size <= 0) {
+    stop("chunk_size must be a positive integer")
+  }
   
   # Determine total number of voxels
   if (is.character(fmri_data)) {
@@ -133,9 +140,10 @@
     close(pb)
     cat("\nChunked processing complete!\n")
   }
-  
-  # Combine results (implementation depends on result type)
-  return(results_list)
+
+  # Combine results
+  combined <- do.call(combine_fun, results_list)
+  return(combined)
 }
 
 # OPTIMIZATION 4: SIMD-Friendly Vectorization (2x speedup)
