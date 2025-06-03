@@ -28,7 +28,7 @@
 
 \item{progress}{Show progress bar?}
 
-\item{fmri_data}{Large fMRI dataset (can be file path or matrix)}
+\item{fmri_data}{fMRI data matrix or other object passed to the processing function. Non\-matrix objects are processed in a single chunk.}
 
 \item{process_function}{Function to apply to each chunk}
 \item{combine_fun}{Function used to combine the chunk results}

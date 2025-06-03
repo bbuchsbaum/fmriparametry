@@ -72,13 +72,15 @@
 # =============================================================
 
 #' Memory-efficient chunked processing for large datasets
-#' 
+#'
 #' Processes voxels in chunks to handle datasets that don't fit in memory.
-#' Enables processing of 100k+ voxels without memory issues.
-#' 
-#' @param fmri_data Large fMRI dataset (can be file path or matrix)
+#' Supports matrix or data frame input; other objects are processed in a single
+#' chunk.
+#'
+#' @param fmri_data fMRI data matrix or other object passed to
+#'   \code{process_function}
 #' @param process_function Function to apply to each chunk
-#' @param chunk_size Number of voxels per chunk
+#' @param chunk_size Number of voxels per chunk for matrix/data frame input
 #' @param combine_fun Function used to combine the chunk results
 #'   (defaults to \code{cbind})
 #' @param progress Show progress bar?
@@ -99,49 +101,43 @@
     n_vox_total <- ncol(fmri_data)
   }
   
-  # Calculate chunks
-  n_chunks <- ceiling(n_vox_total / chunk_size)
-  
-  # Initialize progress bar
-  if (progress) {
-    pb <- txtProgressBar(min = 0, max = n_chunks, style = 3)
-    cat("Processing", n_vox_total, "voxels in", n_chunks, "chunks...\n")
-  }
-  
-  # Process chunks
-  results_list <- vector("list", n_chunks)
-  
-  for (i in seq_len(n_chunks)) {
-    start_idx <- (i - 1) * chunk_size + 1
-    end_idx <- min(i * chunk_size, n_vox_total)
-    
-    # Extract chunk
-    if (is.matrix(fmri_data)) {
+  # Determine number of chunks only for matrix-like input
+  if (is.matrix(fmri_data) || is.data.frame(fmri_data)) {
+    n_chunks <- ceiling(n_vox_total / chunk_size)
+
+    # Initialize progress bar
+    if (progress && n_chunks > 1) {
+      pb <- txtProgressBar(min = 0, max = n_chunks, style = 3)
+      cat("Processing", n_vox_total, "voxels in", n_chunks, "chunks...\n")
+    }
+
+    results_list <- vector("list", n_chunks)
+
+    for (i in seq_len(n_chunks)) {
+      start_idx <- (i - 1) * chunk_size + 1
+      end_idx <- min(i * chunk_size, n_vox_total)
+
       chunk_data <- fmri_data[, start_idx:end_idx, drop = FALSE]
-    } else {
-      chunk_data <- fmri_data  # For other data types
+      results_list[[i]] <- process_function(chunk_data, ...)
+
+      if (progress && n_chunks > 1) {
+        setTxtProgressBar(pb, i)
+      }
+
+      if (i %% 10 == 0) {
+        gc(verbose = FALSE)
+      }
     }
-    
-    # Process chunk
-    results_list[[i]] <- process_function(chunk_data, ...)
-    
-    # Update progress
-    if (progress) {
-      setTxtProgressBar(pb, i)
+
+    if (progress && n_chunks > 1) {
+      close(pb)
+      cat("\nChunked processing complete!\n")
     }
-    
-    # Garbage collection every 10 chunks
-    if (i %% 10 == 0) {
-      gc(verbose = FALSE)
-    }
-  }
-  
-  if (progress) {
-    close(pb)
-    cat("\nChunked processing complete!\n")
+  } else {
+    # For unsupported types process in a single chunk
+    results_list <- list(process_function(fmri_data, ...))
   }
 
-  # Combine results
   combined <- do.call(combine_fun, results_list)
   return(combined)
 }
