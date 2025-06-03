@@ -23,7 +23,10 @@ List containing:
 \itemize{
 \item queue_labels: Character vector of queue assignments
 \item queue_summary: Summary statistics for each queue
+\item queue_proportions: Proportion of voxels in each queue
+\item queue_details: Detailed metrics for each queue
 \item refinement_needed: Logical indicating if any refinement is needed
+\item classification_criteria: Thresholds used for classification
 }
 }
 \description{
