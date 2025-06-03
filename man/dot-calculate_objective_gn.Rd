@@ -9,4 +9,8 @@
 \description{
 Calculate objective function for Gauss-Newton
 }
+\details{
+Returns \code{Inf} when the amplitude denominator \eqn{\sum x\_pred\_raw^2}
+is effectively zero, indicating a singular system.
+}
 \keyword{internal}
