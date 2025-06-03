@@ -344,13 +344,7 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
-##<<<<<<< codex/add-tolerance-check-for-division-in-calculate_objective_gn-a
     dbeta_dtheta_k <- (sum(dx_dtheta_k * y) - beta * sum(dx_dtheta_k * x_hrf)) / denom
-##=======
-    denom <- denom_amp
-    num <- sum(dx_dtheta_k * y) - 2 * beta * sum(dx_dtheta_k * x_hrf)
-    dbeta_dtheta_k <- num / denom
-##>>>>>>> main
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf
