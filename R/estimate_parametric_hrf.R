@@ -88,7 +88,6 @@ estimate_parametric_hrf <- function(
     r2_hard = 0.3,
     se_low = 0.3,
     se_high = 0.7,
-    local_radius = 26,
     gauss_newton_maxiter = 10
   ),
   # Parallel processing (Sprint 3)
@@ -526,7 +525,6 @@ estimate_parametric_hrf <- function(
         hrf_interface = hrf_interface,
         hrf_eval_times = inputs$hrf_eval_times,
         theta_bounds = theta_bounds,
-        local_radius = refinement_thresholds$local_radius,
         parallel = parallel,
         parallel_config = parallel_config
       )
@@ -930,7 +928,7 @@ estimate_parametric_hrf <- function(
                                     theta_current, r_squared,
                                     hrf_interface, hrf_eval_times,
                                     theta_bounds = NULL,
-                                    local_radius = 1, parallel = FALSE,
+                                    parallel = FALSE,
                                     n_cores = 1) {
 
   if (length(voxel_idx) == 0) {
