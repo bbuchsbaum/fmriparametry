@@ -28,7 +28,12 @@
   )
 ) {
   n_vox <- length(r2_voxel)
-  
+
+  if (!is.null(se_theta_hat_voxel) &&
+      nrow(se_theta_hat_voxel) != length(r2_voxel)) {
+    stop("se_theta_hat_voxel must have one row per voxel")
+  }
+
   # Initialize all voxels as "easy" (no refinement needed)
   queue_labels <- rep("easy", n_vox)
   

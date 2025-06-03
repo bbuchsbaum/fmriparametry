@@ -1,6 +1,18 @@
 library(fmriparametric)
 
 
+ test_that(".classify_refinement_queue errors on mismatched SE rows", {
+   r2_vals <- c(0.5, 0.8)
+   se_mat <- matrix(1:6, nrow = 3, ncol = 2)
+   expect_error(
+     fmriparametric:::.classify_refinement_queue(r2_voxel = r2_vals,
+                                                 se_theta_hat_voxel = se_mat),
+     "se_theta_hat_voxel must have one row per voxel"
+   )
+ })
+
+
+
 test_that(".classify_refinement_queue returns full structure when apply_refinement = FALSE", {
   r2 <- runif(5)
   se <- matrix(runif(15), nrow = 5)
@@ -56,6 +68,7 @@ test_that("queue classification works without SE data", {
                c("hard_GN", "moderate_local_recenter", "easy"))
   expect_true(res$refinement_needed)
   expect_true(!res$classification_criteria$se_available)
+})
 
   out <- capture_summary(res)
   expect_match(out, "SE thresholds: not used")
@@ -69,3 +82,4 @@ test_that("queue classification can be turned off", {
   expect_equal(as.numeric(res$queue_summary["easy"]), length(r2_vals))
 
 })
+
