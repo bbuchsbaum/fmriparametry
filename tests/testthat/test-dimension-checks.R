@@ -14,7 +14,6 @@ test_that(".parametric_engine errors on mismatched input sizes", {
     .parametric_engine(
       Y_proj = Y,
       S_target_proj = S,
-      scan_times = seq_len(10),
       hrf_eval_times = seq(0, 30, length.out = 61),
       hrf_interface = hrf_interface,
       theta_seed = hrf_interface$default_seed(),
@@ -22,6 +21,6 @@ test_that(".parametric_engine errors on mismatched input sizes", {
       lambda_ridge = 0.01,
       verbose = FALSE
     ),
-    "S_target_proj has"
+    "S_target_proj must have"
   )
 })

@@ -76,16 +76,14 @@ test_that("full estimation workflow works with basic simulated data", {
     # Mock objects for testing without fmrireg
     event_model <- list(
       terms = list(matrix(stim_vec, ncol = 1)),
-      sampling_rate = 1/TR,
-      class = c("event_model", "list")
+      sampling_rate = 1/TR
     )
     class(event_model) <- c("event_model", "list")
     
     fmri_data <- list(
       data = Y_data,
       sampling_rate = 1/TR,
-      TR = TR,
-      class = c("matrix_dataset", "list")
+      TR = TR
     )
     class(fmri_data) <- c("matrix_dataset", "list")
   }
@@ -310,7 +308,7 @@ test_that("workflow handles edge cases gracefully", {
       fmri_data = matrix(0, nrow = 0, ncol = 0),
       event_model = matrix(0, nrow = 0, ncol = 1)
     ),
-    "X is NULL or empty"
+    "Insufficient time points"
   )
   
   # Mismatched dimensions
@@ -319,7 +317,7 @@ test_that("workflow handles edge cases gracefully", {
       fmri_data = matrix(rnorm(20), nrow = 10, ncol = 2),
       event_model = matrix(rbinom(15, 1, 0.2), ncol = 1)
     ),
-    "wrong number of rows"
+    "don't match fmri_data time points"
   )
   
   # All zero data

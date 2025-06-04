@@ -12,7 +12,6 @@ test_that(".parametric_engine validates Y_proj input", {
     fmriparametric:::.parametric_engine(
       Y_proj = bad_Y,
       S_target_proj = good_S,
-      scan_times = 1:10,
       hrf_eval_times = seq(0, 30, length.out = 10),
       hrf_interface = hrf_interface,
       theta_seed = c(6, 2.5, 0.35),
@@ -38,7 +37,6 @@ test_that(".parametric_engine validates S_target_proj input", {
     fmriparametric:::.parametric_engine(
       Y_proj = Y,
       S_target_proj = bad_S,
-      scan_times = 1:10,
       hrf_eval_times = seq(0, 30, length.out = 10),
       hrf_interface = hrf_interface,
       theta_seed = c(6, 2.5, 0.35),
@@ -64,7 +62,6 @@ test_that(".parametric_engine checks row mismatch", {
     fmriparametric:::.parametric_engine(
       Y_proj = Y,
       S_target_proj = S,
-      scan_times = 1:10,
       hrf_eval_times = seq(0, 30, length.out = 10),
       hrf_interface = hrf_interface,
       theta_seed = c(6, 2.5, 0.35),

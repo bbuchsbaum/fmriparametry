@@ -16,7 +16,11 @@
   # Handle different input types
   if (inherits(fmri_data, c("fmri_dataset", "matrix_dataset"))) {
     # Extract data matrix
-    if ("data" %in% names(fmri_data)) {
+    if (requireNamespace("fmrireg", quietly = TRUE)) {
+      # Use fmrireg's method to extract data
+      data_matrix <- fmrireg::get_data_matrix(fmri_data)
+    } else if ("data" %in% names(fmri_data)) {
+      # Fallback for mock objects
       data_matrix <- fmri_data$data
     } else {
       stop(caller, ": fmri_data object missing 'data' field. ",
@@ -131,8 +135,11 @@
   
   # Handle different input types
   if (inherits(event_model, "event_model")) {
-    # Extract design matrix
-    if ("terms" %in% names(event_model)) {
+    # Extract design matrix using fmrireg if available
+    if (requireNamespace("fmrireg", quietly = TRUE)) {
+      design_matrix <- as.matrix(fmrireg::design_matrix(event_model))
+    } else if ("terms" %in% names(event_model)) {
+      # Fallback for mock objects
       if (length(event_model$terms) == 0) {
         stop(caller, ": event_model contains no terms. ",
              "Check your event model specification.", 

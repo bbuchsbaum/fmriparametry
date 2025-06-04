@@ -3,7 +3,7 @@ test_that(".bayesian_engine computes posterior quantities correctly", {
   Y <- 2:6
   priors <- list(mean = 0, var = 1, sigma2 = 1)
 
-  result <- fmriparametric:::.bayesian_engine(Y, X, priors, mcmc_samples = 0)
+  result <- fmriparametric:::.bayesian_engine(Y, X, priors, mcmc_samples = 1000)
 
   XtX <- as.numeric(crossprod(X))
   Xty <- as.numeric(crossprod(X, Y))
@@ -12,7 +12,7 @@ test_that(".bayesian_engine computes posterior quantities correctly", {
 
   expect_equal(result$posterior_mean, post_mean)
   expect_equal(result$posterior_sd, sqrt(post_var))
-  expect_length(result$samples, 0)
+  expect_length(result$samples, 1000)
 })
 
 test_that(".calculate_objective_gn returns correct sum of squares", {

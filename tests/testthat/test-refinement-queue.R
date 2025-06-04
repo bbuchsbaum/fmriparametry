@@ -68,8 +68,7 @@ test_that("queue classification works without SE data", {
                c("hard_GN", "moderate_local_recenter", "easy"))
   expect_true(res$refinement_needed)
   expect_true(!res$classification_criteria$se_available)
-})
-
+  
   out <- capture_summary(res)
   expect_match(out, "SE thresholds: not used")
 })

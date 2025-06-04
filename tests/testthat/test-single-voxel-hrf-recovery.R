@@ -1,5 +1,3 @@
-context("single voxel hrf recovery")
-
 library(fmriparametric)
 
 # This test verifies that the estimation procedure can recover the

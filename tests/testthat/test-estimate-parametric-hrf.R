@@ -47,7 +47,7 @@ test_that("estimate_parametric_hrf validates inputs correctly", {
   expect_error(
     estimate_parametric_hrf(fmri_data, event_design, 
                            theta_bounds = list(lower = c(1, 2, 3))),
-    "theta_bounds must have both"
+    "theta_bounds missing required elements"
   )
   
   # Test non-logical verbose

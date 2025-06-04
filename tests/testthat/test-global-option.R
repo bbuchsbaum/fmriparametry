@@ -1,5 +1,3 @@
-context("Global refinement option")
-
 library(fmriparametric)
 library(testthat)
 
