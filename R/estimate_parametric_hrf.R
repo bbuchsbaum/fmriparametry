@@ -336,11 +336,15 @@ estimate_parametric_hrf <- function(
   }
   
   # ========== STAGE 3: ITERATIVE REFINEMENT ==========
-  convergence_info <- list(global_iterations = 0, converged = TRUE)
+  convergence_info <- list()
 
   use_global_refinement <- isTRUE(getOption("fmriparametric.refine_global", TRUE))
-
+  
+  
   if (use_global_refinement && global_refinement && global_passes > 0) {
+    # Only initialize these fields if we're actually doing global refinement
+    convergence_info$global_iterations <- 0
+    convergence_info$converged <- TRUE
     if (verbose) cat("\n→ Stage 3: Global iterative refinement...\n")
 
     best_theta <- theta_current
