@@ -787,71 +787,23 @@ estimate_parametric_hrf <- function(
     colnames(theta_hat) <- hrf_interface$parameter_names
   }
   
-  # Pre-allocate results
-  se_theta_hat <- matrix(NA_real_, n_vox, n_params)
-  se_beta0 <- numeric(n_vox)
-  
-  # Compute for each voxel (vectorized where possible)
+  basis_list <- vector("list", n_vox)
+  hrf_list <- vector("list", n_vox)
   for (v in seq_len(n_vox)) {
-    tryCatch({
-      # Current parameter estimates
-      theta_v <- theta_hat[v, ]
-      
-      # Get analytical derivatives from Taylor basis
-      taylor_basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
-      if (!is.matrix(taylor_basis)) {
-        taylor_basis <- matrix(taylor_basis, ncol = n_params + 1)
-      }
-      basis_derivs <- taylor_basis[, -1, drop = FALSE]
-
-      # Convolve derivatives with stimulus (sum across regressors)
-      X_derivs <- matrix(0, n_time, n_params)
-      for (p in seq_len(n_params)) {
-        design_col <- numeric(n_time)
-        for (j in seq_len(ncol(S_target_proj))) {
-          conv_full <- stats::convolve(S_target_proj[, j], rev(basis_derivs[, p]), type = "open")
-          design_col <- design_col + conv_full[seq_len(n_time)]
-        }
-        X_derivs[, p] <- beta0[v] * design_col
-      }
-
-      # Predicted HRF for amplitude SE computation
-      hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
-      x_hrf <- numeric(n_time)
-      for (j in seq_len(ncol(S_target_proj))) {
-        conv_full <- stats::convolve(S_target_proj[, j], rev(hrf_vals), type = "open")
-        x_hrf <- x_hrf + conv_full[seq_len(n_time)]
-      }
-      
-      # Residual variance
-      residuals <- Y_proj[, v] - beta0[v] * x_hrf
-      sigma2 <- sum(residuals^2) / (n_time - 1)
-      
-      # Fisher Information Matrix (approximate)
-      fisher_info <- crossprod(X_derivs) / sigma2
-      
-      # Standard errors (diagonal of inverse Fisher matrix)
-      fisher_inv <- tryCatch({
-        solve(fisher_info)
-      }, error = function(e) {
-        # Use pseudo-inverse if singular
-        svd_result <- svd(fisher_info)
-        svd_result$v %*% diag(1 / pmax(svd_result$d, 1e-12)) %*% t(svd_result$u)
-      })
-      
-      se_theta_hat[v, ] <- sqrt(pmax(0, diag(fisher_inv)))
-      
-      # Standard error for beta0 using design for current HRF
-      se_beta0[v] <- sqrt(sigma2 / sum(x_hrf^2))
-      
-    }, error = function(e) {
-      # Fallback: use rough estimates
-      se_theta_hat[v, ] <- abs(theta_hat[v, ]) * 0.1  # 10% of estimate
-      se_beta0[v] <- abs(beta0[v]) * 0.1
-    })
+    theta_v <- theta_hat[v, ]
+    taylor_basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
+    if (!is.matrix(taylor_basis)) {
+      taylor_basis <- matrix(taylor_basis, ncol = n_params + 1)
+    }
+    basis_list[[v]] <- taylor_basis[, -1, drop = FALSE]
+    hrf_list[[v]] <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
   }
-  
-  return(list(se_theta_hat = se_theta_hat, se_beta0 = se_beta0))
+
+  res <- compute_standard_errors_bulk_cpp(
+    basis_list, hrf_list, Y_proj, S_target_proj, as.numeric(beta0)
+  )
+
+  return(res)
 }
 
 

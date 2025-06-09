@@ -24,6 +24,21 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// compute_standard_errors_bulk_cpp
+Rcpp::List compute_standard_errors_bulk_cpp(const Rcpp::List& derivs_list, const Rcpp::List& hrf_list, const Eigen::Map<Eigen::MatrixXd>& Y, const Eigen::Map<Eigen::MatrixXd>& S, const Eigen::VectorXd& beta0);
+RcppExport SEXP _fmriparametric_compute_standard_errors_bulk_cpp(SEXP derivs_listSEXP, SEXP hrf_listSEXP, SEXP YSEXP, SEXP SSEXP, SEXP beta0SEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type derivs_list(derivs_listSEXP);
+    Rcpp::traits::input_parameter< const Rcpp::List& >::type hrf_list(hrf_listSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const Eigen::Map<Eigen::MatrixXd>& >::type S(SSEXP);
+    Rcpp::traits::input_parameter< const Eigen::VectorXd& >::type beta0(beta0SEXP);
+    rcpp_result_gen = Rcpp::wrap(compute_standard_errors_bulk_cpp(derivs_list, hrf_list, Y, S, beta0));
+    return rcpp_result_gen;
+END_RCPP
+}
 // ridge_linear_solve_cpp
 Eigen::MatrixXd ridge_linear_solve_cpp(const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::MatrixXd>& Y, double lambda);
 RcppExport SEXP _fmriparametric_ridge_linear_solve_cpp(SEXP XSEXP, SEXP YSEXP, SEXP lambdaSEXP) {
@@ -41,6 +56,7 @@ END_RCPP
 static const R_CallMethodDef CallEntries[] = {
     {"_fmriparametric_fast_batch_convolution_cpp", (DL_FUNC) &_fmriparametric_fast_batch_convolution_cpp, 3},
     {"_fmriparametric_ridge_linear_solve_cpp", (DL_FUNC) &_fmriparametric_ridge_linear_solve_cpp, 3},
+    {"_fmriparametric_compute_standard_errors_bulk_cpp", (DL_FUNC) &_fmriparametric_compute_standard_errors_bulk_cpp, 5},
     {NULL, NULL, 0}
 };
 
