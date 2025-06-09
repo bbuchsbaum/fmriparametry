@@ -9,3 +9,7 @@ ridge_linear_solve_cpp <- function(X, Y, lambda) {
     .Call('_fmriparametric_ridge_linear_solve_cpp', PACKAGE = 'fmriparametric', X, Y, lambda)
 }
 
+compute_standard_errors_bulk_cpp <- function(derivs_list, hrf_list, Y, S, beta0) {
+    .Call('_fmriparametric_compute_standard_errors_bulk_cpp', PACKAGE = 'fmriparametric', derivs_list, hrf_list, Y, S, beta0)
+}
+
