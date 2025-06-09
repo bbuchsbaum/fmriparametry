@@ -926,19 +926,28 @@ estimate_parametric_hrf <- function(
 
   bounds <- theta_bounds
   delays <- seq(-8, 12, by = 1)
-  tau_est <- numeric(n_vox)
+  n_time <- nrow(Y)
 
-  for (v in seq_len(n_vox)) {
-    cors <- vapply(delays, function(l) {
-      if (l >= 0) {
-        s_shift <- c(rep(0, l), S[, 1])[1:nrow(S)]
-      } else {
-        s_shift <- c(S[, 1], rep(0, -l))[(-l + 1):nrow(S)]
-      }
-      stats::cor(Y[, v], s_shift, use = "complete.obs")
-    }, numeric(1))
-    tau_est[v] <- delays[which.max(abs(cors))]
-  }
+  # Matrix-based cross-correlation for all voxels simultaneously
+  stim <- S[, 1]
+  stim_shifts <- vapply(delays, function(l) {
+    if (l >= 0) {
+      c(rep(0, l), stim)[1:n_time]
+    } else {
+      c(stim, rep(0, -l))[(-l + 1):n_time]
+    }
+  }, numeric(n_time))
+
+  Y_cent <- scale(Y, center = TRUE, scale = FALSE)
+  stim_cent <- scale(stim_shifts, center = TRUE, scale = FALSE)
+  Y_sd <- sqrt(colSums(Y_cent^2) / (n_time - 1))
+  stim_sd <- sqrt(colSums(stim_cent^2) / (n_time - 1))
+
+  cors_mat <- (t(Y_cent) %*% stim_cent) / (n_time - 1)
+  cors_mat <- sweep(cors_mat, 1, Y_sd, "/")
+  cors_mat <- sweep(cors_mat, 2, stim_sd, "/")
+
+  tau_est <- delays[max.col(abs(cors_mat), ties.method = "first")]
 
   features <- matrix(tau_est, ncol = 1)
   km <- kmeans(features, centers = k, nstart = 20, iter.max = 50)
