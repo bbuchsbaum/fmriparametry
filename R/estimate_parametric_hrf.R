@@ -960,51 +960,46 @@ estimate_parametric_hrf <- function(
   n_time <- nrow(Y_proj)
   n_params <- length(hrf_interface$parameter_names)
 
-  refine_one <- function(v) {
-    theta_v <- theta_current[v, ]
+  theta_block <- theta_current[voxel_idx, , drop = FALSE]
+  id <- apply(theta_block, 1, paste, collapse = ",")
+  groups <- split(seq_along(id), id)
+
+  theta_out <- theta_block
+  amps_out <- numeric(length(voxel_idx))
+
+  for (g in groups) {
+    theta_v <- theta_block[g[1], ]
     basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
     if (!is.matrix(basis)) {
       basis <- matrix(basis, ncol = n_params + 1)
     }
-    X <- matrix(0, n_time, ncol(basis))
-    for (j in seq_len(ncol(basis))) {
+    X <- sapply(seq_len(ncol(basis)), function(j) {
       conv_full <- stats::convolve(S_target_proj[, 1], rev(basis[, j]), type = "open")
-      X[, j] <- conv_full[seq_len(n_time)]
-    }
+      conv_full[seq_len(n_time)]
+    })
     qr_decomp <- qr(X)
     Q <- qr.Q(qr_decomp)
     R <- qr.R(qr_decomp)
-    coeffs <- solve(R + 0.01 * diag(ncol(R))) %*% t(Q) %*% Y_proj[, v]
-    beta0_new <- as.numeric(coeffs[1])
-    if (abs(beta0_new) < 1e-6) {
-      return(list(theta = theta_v, amp = beta0_new, r2 = r_squared[v]))
+    Y_block <- Y_proj[, voxel_idx[g], drop = FALSE]
+    coeffs <- solve(R + 0.01 * diag(ncol(R)), t(Q) %*% Y_block)
+    beta0_new <- as.numeric(coeffs[1, ])
+
+    delta <- matrix(0, length(beta0_new), n_params)
+    valid <- abs(beta0_new) >= 1e-6
+    if (any(valid)) {
+      delta[valid, ] <- t(coeffs[2:(n_params + 1), valid, drop = FALSE]) / beta0_new[valid]
     }
-    delta <- coeffs[2:(n_params + 1)] / beta0_new
-    theta_new <- theta_v + as.numeric(delta)
+    theta_new <- sweep(delta, 2, theta_v, FUN = "+")
     theta_new <- pmax(bounds$lower, pmin(bounds$upper, theta_new))
+
     fitted <- X %*% coeffs
-    r2_new <- 1 - sum((Y_proj[, v] - fitted)^2) / sum((Y_proj[, v] - mean(Y_proj[, v]))^2)
-    if (is.na(r2_new) || r2_new <= r_squared[v]) {
-      return(list(theta = theta_v, amp = beta0_new, r2 = r_squared[v]))
-    }
-    list(theta = theta_new, amp = beta0_new, r2 = r2_new)
-  }
+    y_means <- colMeans(Y_block)
+    r2_new <- 1 - colSums((Y_block - fitted)^2) /
+      colSums((Y_block - matrix(y_means, n_time, length(g), byrow = TRUE))^2)
 
-  if (parallel && n_cores > 1 && .Platform$OS.type == "unix") {
-    res_list <- parallel::mclapply(voxel_idx, refine_one, mc.cores = n_cores)
-  } else if (parallel && n_cores > 1) {
-    cl <- parallel::makeCluster(n_cores)
-    res_list <- parallel::parLapply(cl, voxel_idx, refine_one)
-    parallel::stopCluster(cl)
-  } else {
-    res_list <- lapply(voxel_idx, refine_one)
-  }
-
-  theta_out <- theta_current[voxel_idx, , drop = FALSE]
-  amps_out <- numeric(length(voxel_idx))
-  for (i in seq_along(res_list)) {
-    theta_out[i, ] <- res_list[[i]]$theta
-    amps_out[i] <- res_list[[i]]$amp
+    keep <- !is.na(r2_new) & r2_new > r_squared[voxel_idx[g]] & valid
+    theta_out[g[keep], ] <- theta_new[keep, , drop = FALSE]
+    amps_out[g] <- beta0_new
   }
 
   list(theta_refined = theta_out, amplitudes = amps_out)
