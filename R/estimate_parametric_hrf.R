@@ -6,13 +6,23 @@
 #' the provided parameter seed. Additional stages can iteratively update this
 #' seed and apply specialized refinement algorithms.
 #' 
+#' @section Implementation Selection:
+#' This function uses the Strangler Fig pattern to safely migrate from the
+#' original monolithic implementation to a modular refactored version.
+#' The refactored implementation is now the default. Legacy support is available
+#' temporarily via `options(fmriparametric.use_legacy = TRUE)`.
+#' 
 #' @section Package Options:
 #' Global iterative refinement (Stage 3) is controlled by the option
 #' `fmriparametric.refine_global`. Set to `FALSE` to disable global re-centering
 #' for all calls.
 #'
 #' @section Iteration and Convergence:
-#' The core engine runs a single Taylor pass around `theta_seed`. If `global_refinement = TRUE`, the seed is updated for up to `global_passes` iterations until the maximum parameter change is below `convergence_epsilon`. K-means initialization can provide alternative seeds before this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization with its own iteration limits (e.g. `refinement_thresholds$gauss_newton_maxiter`).
+#' The core engine runs a single Taylor pass around `theta_seed`. If `global_refinement = TRUE`, 
+#' the seed is updated for up to `global_passes` iterations until the maximum parameter change 
+#' is below `convergence_epsilon`. K-means initialization can provide alternative seeds before 
+#' this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization 
+#' with its own iteration limits (e.g. `refinement_thresholds$gauss_newton_maxiter`).
 #'
 #' @param fmri_data An fMRI dataset object or numeric matrix (timepoints x voxels)
 #' @param event_model Event timing design matrix or event model object
@@ -27,6 +37,7 @@
 #' @param mask Optional voxel selection mask
 #' @param global_refinement Logical: perform iterative global refinement? (Sprint 2)
 #' @param global_passes Number of global refinement iterations (default 3)
+#' @param convergence_epsilon Convergence criterion for global refinement (default 0.01)
 #' @param kmeans_refinement Logical: perform K-means local refinement? (Sprint 3)
 #' @param kmeans_k Number of clusters for K-means (default 5)
 #' @param kmeans_passes Number of K-means refinement passes (default 2)
@@ -39,11 +50,11 @@
 #'   Determines the level of input validation. "maximum" triggers
 #'   comprehensive checks, "balanced" performs standard checks, and
 #'   "performance" uses minimal validation.
-#'
-#'   The chosen level controls which helper functions (e.g.,
-#'   \code{.validate_fmri_data}) are executed before fitting.
 #' @param progress Logical: show progress bar?
 #' @param verbose Logical: print detailed messages?
+#' @param .implementation Deprecated. Character string specifying which implementation to use.
+#'   The refactored implementation is now the default. Use "legacy" to temporarily
+#'   access the old implementation. The "compare" option has been removed.
 #'
 #' @return Object of class 'parametric_hrf_fit' containing:
 #'   - estimated_parameters: Matrix of HRF parameters (voxels x parameters)
@@ -51,12 +62,11 @@
 #'   - standard_errors: Parameter standard errors (if computed)
 #'   - fit_quality: List with R-squared and other metrics
 #'   - convergence_info: Detailed convergence information
-#'     Convergence summaries include global iteration counts and, when tiered refinement is used, Gauss-Newton statistics.
 #'   - refinement_info: Information about refinement strategies applied
 #'   - metadata: Complete analysis metadata
 #'
 #' @examples
-#' # Simulated quick example
+#' # Basic example
 #' set.seed(1)
 #' fmri_data <- matrix(rnorm(40), nrow = 20, ncol = 2)
 #' events <- matrix(0, nrow = 20, ncol = 1)
@@ -64,13 +74,24 @@
 #' fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
 #'                                verbose = FALSE)
 #' summary(fit)
+#' 
+#' # Using data-driven initialization
+#' fit_dd <- estimate_parametric_hrf(fmri_data, events, 
+#'                                   theta_seed = "data_driven",
+#'                                   verbose = FALSE)
+#' 
+#' # With refinement options
+#' fit_refined <- estimate_parametric_hrf(fmri_data, events,
+#'                                        global_refinement = TRUE,
+#'                                        tiered_refinement = "moderate",
+#'                                        verbose = FALSE)
 #'
 #' @export
 estimate_parametric_hrf <- function(
   fmri_data,
   event_model,
   parametric_hrf = "lwu",
-  # Basic parameters (Sprint 1)
+  # Basic parameters
   theta_seed = NULL,
   theta_bounds = NULL,
   confound_formula = NULL,
@@ -79,15 +100,15 @@ estimate_parametric_hrf <- function(
   hrf_span = 30,
   lambda_ridge = 0.01,
   mask = NULL,
-  # Global refinement (Sprint 2)
+  # Global refinement
   global_refinement = TRUE,
   global_passes = 3,
   convergence_epsilon = 0.01,
-  # K-means refinement (Sprint 3)
+  # K-means refinement
   kmeans_refinement = FALSE,
   kmeans_k = 5,
   kmeans_passes = 2,
-  # Tiered refinement (Sprint 3)
+  # Tiered refinement
   tiered_refinement = c("none", "moderate", "aggressive"),
   refinement_thresholds = list(
     r2_easy = 0.7,
@@ -96,7 +117,7 @@ estimate_parametric_hrf <- function(
     se_high = 0.7,
     gauss_newton_maxiter = 10
   ),
-  # Parallel processing (Sprint 3)
+  # Parallel processing
   parallel = FALSE,
   n_cores = NULL,
   # Output options
@@ -104,963 +125,93 @@ estimate_parametric_hrf <- function(
   # Safety and diagnostics
   safety_mode = c("balanced", "maximum", "performance"),
   progress = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  # Implementation selection
+  .implementation = NULL
 ) {
   
-  # Start timing
-  total_start <- Sys.time()
-  
-  # Match arguments
-  tiered_refinement <- match.arg(tiered_refinement)
-  safety_mode <- match.arg(safety_mode)
-
-  if (!is.logical(verbose) || length(verbose) != 1) {
-    stop("verbose must be logical TRUE/FALSE", call. = FALSE)
+  # Ensure matrices are double-precision for C++ backend
+  if (is.matrix(fmri_data) && typeof(fmri_data) != "double") {
+    storage.mode(fmri_data) <- "double"
   }
-  if (!is.logical(progress) || length(progress) != 1) {
-    stop("progress must be logical TRUE/FALSE", call. = FALSE)
+  if (is.matrix(event_model) && typeof(event_model) != "double") {
+    storage.mode(event_model) <- "double"
   }
   
-  # Initialize progress tracking if requested
-  if (progress && verbose) {
-    cat("╔══════════════════════════════════════════════════════════════╗\n")
-    cat("║             Parametric HRF estimation in progress            ║\n")
-    cat("╚══════════════════════════════════════════════════════════════╝\n\n")
-  }
-  
-  # ========== STAGE 0: VALIDATION (Rock-solid safety) ==========
-  if (verbose) cat("→ Stage 0: Input validation and safety checks...\n")
-  
-  # Validate inputs based on safety mode
-  validation_level <- switch(safety_mode,
-    maximum = "comprehensive",
-    balanced = "standard",
-    performance = "minimal"
-  )
-
-  # Run input validation helpers depending on level
-
-  caller <- "estimate_parametric_hrf"
-
-  if (validation_level == "comprehensive") {
-    .rock_solid_validate_inputs(
-      fmri_data = fmri_data,
-      event_model = event_model,
-      parametric_hrf = parametric_hrf,
-      theta_seed = theta_seed,
-      theta_bounds = theta_bounds,
-      hrf_span = hrf_span,
-      lambda_ridge = lambda_ridge,
-      recenter_global_passes = global_passes,
-      recenter_epsilon = convergence_epsilon,
-      r2_threshold = 0.1,
-      mask = mask,
-      verbose = verbose,
-      caller = caller
-    )
-  } else if (validation_level == "standard") {
-    fmri_ok <- .validate_fmri_data(fmri_data, caller)
-    .validate_event_model(event_model, fmri_ok$n_time, caller)
-    theta_bounds <- .validate_theta_bounds(
-      theta_bounds,
-      length(.create_hrf_interface(parametric_hrf)$parameter_names),
-      .create_hrf_interface(parametric_hrf)$parameter_names,
-      caller
-    )
-  } else {
-    if (is.null(fmri_data)) {
-      stop(caller, ": fmri_data cannot be NULL.", call. = FALSE)
-    }
-    if (is.null(event_model)) {
-      stop(caller, ": event_model cannot be NULL.", call. = FALSE)
-    }
-  }
-
-  # ========== STAGE 0A: Data preparation ==========
-  
-  # Create HRF interface
-  hrf_interface <- .create_hrf_interface(parametric_hrf)
-  
-  # Prepare data
-  if (verbose) cat("→ Preparing data matrices...\n")
-  inputs <- .prepare_parametric_inputs(
+  # Prepare arguments list for reuse
+  args <- list(
     fmri_data = fmri_data,
     event_model = event_model,
+    parametric_hrf = parametric_hrf,
+    theta_seed = theta_seed,
+    theta_bounds = theta_bounds,
     confound_formula = confound_formula,
     baseline_model = baseline_model,
     hrf_eval_times = hrf_eval_times,
     hrf_span = hrf_span,
-    mask = mask
+    lambda_ridge = lambda_ridge,
+    mask = mask,
+    global_refinement = global_refinement,
+    global_passes = global_passes,
+    convergence_epsilon = convergence_epsilon,
+    kmeans_refinement = kmeans_refinement,
+    kmeans_k = kmeans_k,
+    kmeans_passes = kmeans_passes,
+    tiered_refinement = tiered_refinement,
+    refinement_thresholds = refinement_thresholds,
+    parallel = parallel,
+    n_cores = n_cores,
+    compute_se = compute_se,
+    safety_mode = safety_mode,
+    progress = progress,
+    verbose = verbose
   )
   
-  n_vox <- ncol(inputs$Y_proj)
-  n_time <- nrow(inputs$Y_proj)
-  
-  # Initialize results storage
-  theta_current <- matrix(NA_real_, n_vox, length(hrf_interface$parameter_names))
-  colnames(theta_current) <- hrf_interface$parameter_names
-  
-  # ========== STAGE 1: INITIALIZATION ==========
-  if (verbose) cat("\n→ Stage 1: Parameter initialization...\n")
-  
-  # Handle theta_seed
-  if (is.null(theta_seed)) {
-    theta_seed <- hrf_interface$default_seed()
-  } else if (identical(theta_seed, "data_driven")) {
-    if (verbose) cat("  Computing data-driven initialization...\n")
-    theta_seed <- .compute_data_driven_seed(
-      Y = inputs$Y_proj,
-      S = inputs$S_target_proj,
-      hrf_interface = hrf_interface,
-      theta_bounds = theta_bounds
-    )
-  } else {
-    if (!is.numeric(theta_seed)) {
-      stop("theta_seed must be numeric", call. = FALSE)
-    }
-    expected_len <- length(hrf_interface$parameter_names)
-    if (length(theta_seed) != expected_len) {
-      stop(sprintf("theta_seed must have length %d", expected_len), call. = FALSE)
-    }
-  }
-  
-  # Handle theta_bounds
-  if (is.null(theta_bounds)) {
-    theta_bounds <- hrf_interface$default_bounds()
-  } else {
-    if (!is.list(theta_bounds) ||
-        !all(c("lower", "upper") %in% names(theta_bounds))) {
-      stop("theta_bounds must have both 'lower' and 'upper' components",
-           call. = FALSE)
-    }
-    expected_len <- length(hrf_interface$parameter_names)
-    if (length(theta_bounds$lower) != expected_len ||
-        length(theta_bounds$upper) != expected_len) {
-      stop(sprintf("theta_bounds components must have length %d",
-                   expected_len), call. = FALSE)
-    }
-    if (!is.numeric(theta_bounds$lower) || !is.numeric(theta_bounds$upper)) {
-      stop("theta_bounds values must be numeric", call. = FALSE)
-    }
-  }
-  
-  # Ensure theta_seed is within safe bounds for numerical derivatives
-  eps <- c(0.01, 0.01, 0.01)
-  theta_seed <- pmax(theta_bounds$lower + eps,
-                     pmin(theta_seed, theta_bounds$upper - eps))
-  
-  # Set initial values
-  for (j in seq_len(ncol(theta_current))) {
-    theta_current[, j] <- theta_seed[j]
-  }
-  
-  # K-means initialization if requested
-  kmeans_iterations <- 0
-  if (kmeans_refinement && kmeans_k > 1) {
-    if (verbose) cat("  Performing K-means clustering for initialization...\n")
-    kmeans_result <- .perform_kmeans_initialization(
-      Y = inputs$Y_proj,
-      S = inputs$S_target_proj,
-      k = kmeans_k,
-      hrf_interface = hrf_interface,
-      theta_bounds = theta_bounds
-    )
-    kmeans_iterations <- kmeans_result$iterations
-    # Update seeds based on clusters
-    for (k in seq_len(kmeans_k)) {
-      cluster_voxels <- which(kmeans_result$cluster == k)
-      if (length(cluster_voxels) > 0) {
-        theta_current[cluster_voxels, ] <- matrix(
-          kmeans_result$centers[k, ],
-          nrow = length(cluster_voxels),
-          ncol = ncol(theta_current),
-          byrow = TRUE
-        )
-      }
-    }
-  }
-  
-  # ========== STAGE 2: CORE ESTIMATION ==========
-  if (verbose) cat("\n→ Stage 2: Core parametric estimation...\n")
-  
-  # Setup parallel backend if requested
-  parallel_config <- NULL
-  if (parallel) {
-    parallel_config <- .setup_parallel_backend(n_cores = n_cores, verbose = verbose)
-    n_cores <- parallel_config$n_cores
-    process_function <- .parametric_engine_parallel
-  } else {
-    process_function <- .parametric_engine
-  }
-  
-  # Run core engine (with proper parameter handling)
-  if (parallel) {
-    core_result <- process_function(
-      Y_proj = inputs$Y_proj,
-      S_target_proj = inputs$S_target_proj,
-      hrf_eval_times = inputs$hrf_eval_times,
-      hrf_interface = hrf_interface,
-      theta_seed = theta_seed,
-      theta_bounds = theta_bounds,
-      lambda_ridge = lambda_ridge,
-      parallel_config = parallel_config
-    )
-  } else {
-    core_result <- process_function(
-      Y_proj = inputs$Y_proj,
-      S_target_proj = inputs$S_target_proj,
-      hrf_eval_times = inputs$hrf_eval_times,
-      hrf_interface = hrf_interface,
-      theta_seed = theta_seed,
-      theta_bounds = theta_bounds,
-      lambda_ridge = lambda_ridge
-    )
-  }
-  
-  # Update current estimates
-  theta_current <- core_result$theta_hat
-  amplitudes <- core_result$beta0
-  
-  # Ensure theta_current is always a matrix
-  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-    theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
-    colnames(theta_current) <- hrf_interface$parameter_names
-  }
-  
-  # Use R-squared from the parametric engine
-  r_squared <- core_result$r_squared
-  
-  if (verbose) {
-    cat(sprintf("  Initial fit: Mean R² = %.3f (range: %.3f - %.3f)\n",
-                mean(r_squared), min(r_squared), max(r_squared)))
-  }
-  
-  # ========== STAGE 3: ITERATIVE REFINEMENT ==========
-  convergence_info <- list()
-
-  use_global_refinement <- isTRUE(getOption("fmriparametric.refine_global", TRUE))
-  
-  
-  if (use_global_refinement && global_refinement && global_passes > 0) {
-    # Only initialize these fields if we're actually doing global refinement
-    convergence_info$global_iterations <- 0
-    convergence_info$converged <- TRUE
-    if (verbose) cat("\n→ Stage 3: Global iterative refinement...\n")
-
-    best_theta <- theta_current
-    best_amplitudes <- amplitudes
-    best_r2 <- mean(r_squared)
-    global_iter_count <- 0
-    global_converged <- FALSE
-
-    for (iter in seq_len(global_passes)) {
-      global_iter_count <- iter
-      if (verbose) cat(sprintf("  Iteration %d/%d: ", iter, global_passes))
-
-      # Store previous parameters
-      theta_prev <- theta_current
-      amplitudes_prev <- amplitudes
-      r_squared_prev <- r_squared
-      
-      # Re-center globally with bounds enforcement
-      if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-        theta_current <- matrix(
-          theta_current,
-          nrow = n_vox,
-          ncol = length(hrf_interface$parameter_names)
-        )
-        colnames(theta_current) <- hrf_interface$parameter_names
-      }
-
-      theta_center <- apply(theta_current, 2, median)
-      
-      # Ensure theta_center is within bounds before using as seed
-      if (!is.null(theta_bounds)) {
-        theta_center <- pmax(theta_bounds$lower, pmin(theta_center, theta_bounds$upper))
-        # Stay slightly inside bounds to avoid issues in derivative calculations
-        eps <- 1e-6
-        theta_center <- pmax(theta_bounds$lower + eps,
-                             pmin(theta_center, theta_bounds$upper - eps))
-      }
-      
-      # Re-run engine with new center
-      if (parallel) {
-        iter_result <- process_function(
-          Y_proj = inputs$Y_proj,
-          S_target_proj = inputs$S_target_proj,
-          hrf_eval_times = inputs$hrf_eval_times,
-          hrf_interface = hrf_interface,
-          theta_seed = theta_center,
-          theta_bounds = theta_bounds,
-          lambda_ridge = lambda_ridge,
-          parallel_config = parallel_config
-        )
-      } else {
-        iter_result <- process_function(
-          Y_proj = inputs$Y_proj,
-          S_target_proj = inputs$S_target_proj,
-          hrf_eval_times = inputs$hrf_eval_times,
-          hrf_interface = hrf_interface,
-          theta_seed = theta_center,
-          theta_bounds = theta_bounds,
-          lambda_ridge = lambda_ridge
-        )
-      }
-      
-      # Update estimates
-      theta_current <- iter_result$theta_hat
-      amplitudes <- iter_result$beta0
-      
-      # Ensure theta_current is always a matrix (critical for apply() calls)
-      if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-        theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
-        colnames(theta_current) <- hrf_interface$parameter_names
-      }
-      
-      # Additional safety check - verify dimensions
-      if (nrow(theta_current) != n_vox || ncol(theta_current) != length(hrf_interface$parameter_names)) {
-        warning("theta_current dimensions incorrect, reshaping...")
-        theta_current <- matrix(as.vector(theta_current), nrow = n_vox, ncol = length(hrf_interface$parameter_names))
-        colnames(theta_current) <- hrf_interface$parameter_names
-      }
-      
-      # Apply bounds to prevent parameter drift
-      if (!is.null(theta_bounds)) {
-        theta_current <- pmax(theta_bounds$lower, pmin(theta_current, theta_bounds$upper))
-      }
-
-      # Check convergence and fit quality
-      max_change <- max(abs(theta_current - theta_prev))
-      r_squared_new <- iter_result$r_squared
-
-      mean_r2_change <- mean(r_squared_new) - mean(r_squared_prev)
-
-      if (mean_r2_change < 0) {
-        if (verbose) cat("No improvement, rolling back\n")
-        theta_current <- theta_prev
-        amplitudes <- amplitudes_prev
-        r_squared <- r_squared_prev
-        convergence_info[[paste0("global_iter_", iter)]] <- list(
-          max_param_change = max_change,
-          mean_r2 = mean(r_squared_prev),
-          r2_improvement = mean_r2_change,
-          rolled_back = TRUE
-        )
-        break
-      } else {
-        amplitudes <- iter_result$beta0
-        r_squared <- r_squared_new
-
-        if (mean(r_squared) > best_r2) {
-          best_r2 <- mean(r_squared)
-          best_theta <- theta_current
-          best_amplitudes <- amplitudes
-        }
-
-        if (verbose) {
-          cat(sprintf("Max Δθ = %.4f, Mean R² = %.3f (Δ = %+.4f)\n",
-                      max_change, mean(r_squared), mean_r2_change))
-        }
-
-        convergence_info[[paste0("global_iter_", iter)]] <- list(
-          max_param_change = max_change,
-          mean_r2 = mean(r_squared),
-          r2_improvement = mean_r2_change,
-          rolled_back = FALSE
-        )
-
-        if (max_change < convergence_epsilon) {
-          if (verbose) cat("  ✓ Converged!\n")
-          global_converged <- TRUE
-          break
-        }
-      }
-    }
-
-    theta_current <- best_theta
-    amplitudes <- best_amplitudes
-    convergence_info$global_iterations <- global_iter_count
-    convergence_info$converged <- global_converged
-  }
-  
-  # ========== STAGE 4: TIERED REFINEMENT ==========
-  refinement_info <- list()
-  se_theta <- NULL
-  
-  if (tiered_refinement != "none") {
-    if (verbose) cat("\n→ Stage 4: Tiered voxel refinement...\n")
-    
-    # First compute standard errors if needed for classification
-    if (compute_se) {
-      se_result <- .compute_standard_errors_delta(
-        theta_hat = theta_current,
-        beta0 = amplitudes,
-        Y_proj = inputs$Y_proj,
-        S_target_proj = inputs$S_target_proj,
-        hrf_interface = hrf_interface,
-        hrf_eval_times = inputs$hrf_eval_times
+  # Handle deprecated .implementation parameter
+  if (!is.null(.implementation)) {
+    if (.implementation == "legacy") {
+      warning(
+        "The '.implementation' parameter is deprecated. ",
+        "The refactored implementation is now the default.\n",
+        "To temporarily use the legacy implementation, set:\n",
+        "  options(fmriparametric.use_legacy = TRUE)\n",
+        "Legacy support will be removed in a future version.",
+        call. = FALSE
       )
-      se_theta <- se_result$se_theta_hat
-    } else {
-      se_theta <- matrix(0, n_vox, ncol(theta_current))
+      # Load and run legacy implementation
+      .load_legacy_implementation()
+      return(do.call(.estimate_hrf_legacy, args))
     }
     
-    # Classify voxels
-    voxel_classes <- .classify_voxels_for_refinement(
-      r_squared = r_squared,
-      se_theta = se_theta,
-      thresholds = refinement_thresholds
-    )
+    if (.implementation == "compare") {
+      stop(
+        "The 'compare' implementation option has been removed.\n",
+        "Use the test suite for implementation comparison.",
+        call. = FALSE
+      )
+    }
     
+    if (.implementation == "refactored") {
+      # Silently proceed with refactored (now default)
+    } else {
+      stop(
+        "Unknown implementation: ", .implementation, "\n",
+        "Valid options are 'legacy' or NULL (for default).",
+        call. = FALSE
+      )
+    }
+  }
+  
+  # Check for global option to use legacy (temporary escape hatch)
+  if (isTRUE(getOption("fmriparametric.use_legacy"))) {
     if (verbose) {
-      cat(sprintf("  Voxel classification:\n"))
-      cat(sprintf("    Easy (high R²): %d voxels\n", sum(voxel_classes == "easy")))
-      cat(sprintf("    Moderate: %d voxels\n", sum(voxel_classes == "moderate")))
-      cat(sprintf("    Hard (low R²): %d voxels\n", sum(voxel_classes == "hard")))
+      message("Using legacy implementation (from global option)")
     }
-    
-    # Apply refinement based on classification
-    refinement_info <- list(
-      classification = voxel_classes,
-      n_easy = sum(voxel_classes == "easy"),
-      n_moderate = sum(voxel_classes == "moderate"),
-      n_hard = sum(voxel_classes == "hard")
-    )
-    
-    # Moderate voxels: Local re-centering
-    moderate_idx <- which(voxel_classes == "moderate")
-    if (length(moderate_idx) > 0 && tiered_refinement %in% c("moderate", "aggressive")) {
-      if (verbose) cat("  Refining moderate voxels with local re-centering...\n")
-      
-      moderate_result <- .refine_moderate_voxels(
-        voxel_idx = moderate_idx,
-        Y_proj = inputs$Y_proj,
-        S_target_proj = inputs$S_target_proj,
-        theta_current = theta_current,
-        r_squared = r_squared,
-        hrf_interface = hrf_interface,
-        hrf_eval_times = inputs$hrf_eval_times,
-        theta_bounds = theta_bounds,
-        parallel = parallel,
-        n_cores = if (parallel) parallel_config$n_cores else 1
-      )
-      
-      # Update results
-      theta_current[moderate_idx, ] <- moderate_result$theta_refined
-      amplitudes[moderate_idx] <- moderate_result$amplitudes
-      refinement_info$moderate_refined <- length(moderate_idx)
-    }
-    
-    # Hard voxels: Gauss-Newton
-    hard_idx <- which(voxel_classes == "hard")
-    if (length(hard_idx) > 0 && tiered_refinement == "aggressive") {
-      if (verbose) cat("  Refining hard voxels with Gauss-Newton optimization...\n")
-      
-      hard_result <- .refine_hard_voxels(
-        voxel_idx = hard_idx,
-        Y_proj = inputs$Y_proj,
-        S_target_proj = inputs$S_target_proj,
-        theta_current = theta_current,
-        r_squared = r_squared,
-        hrf_interface = hrf_interface,
-        hrf_eval_times = inputs$hrf_eval_times,
-        theta_bounds = theta_bounds,
-        max_iter = refinement_thresholds$gauss_newton_maxiter,
-        parallel = parallel,
-        n_cores = if (parallel) parallel_config$n_cores else 1
-      )
-      
-      # Update results
-      theta_current[hard_idx, ] <- hard_result$theta_refined
-      amplitudes[hard_idx] <- hard_result$amplitudes
-      refinement_info$hard_refined <- length(hard_idx)
-      refinement_info$n_converged <- hard_result$gn_info$n_converged
-      refinement_info$n_improved <- hard_result$gn_info$n_improved
-      convergence_info$gauss_newton <- list(
-        n_hard = length(hard_idx),
-        n_converged = hard_result$gn_info$n_converged,
-        n_improved = hard_result$gn_info$n_improved,
-        mean_iterations = mean(hard_result$gn_info$iteration_counts)
-      )
-    }
-    
-    # Recompute final R-squared after refinement
-    # Need to properly compute fitted values using the refined parameters
-    # For now, keep the r_squared from the last iteration
-    # TODO: Implement proper R-squared computation after refinement
-    
-    if (verbose) {
-      cat(sprintf("  Final fit after refinement: Mean R² = %.3f\n", mean(r_squared)))
-    }
+    # Load and run legacy implementation
+    .load_legacy_implementation()
+    return(do.call(.estimate_hrf_legacy, args))
   }
   
-  # ========== STAGE 5: STATISTICAL INFERENCE ==========
-  if (verbose && compute_se) cat("\n→ Stage 5: Computing standard errors...\n")
-  
-  # Compute standard errors if not already done
-  if (compute_se && is.null(se_theta)) {
-    se_result <- .compute_standard_errors_delta(
-      theta_hat = theta_current,
-      beta0 = amplitudes,
-      Y_proj = inputs$Y_proj,
-      S_target_proj = inputs$S_target_proj,
-      hrf_interface = hrf_interface,
-      hrf_eval_times = inputs$hrf_eval_times
-    )
-    se_theta <- se_result$se_theta_hat
-    se_amplitudes <- se_result$se_beta0
-  } else {
-    se_theta <- NULL
-    se_amplitudes <- NULL
-  }
-  
-  # ========== FINALIZE RESULTS ==========
-  total_time <- as.numeric(difftime(Sys.time(), total_start, units = "secs"))
-  
-  if (verbose) {
-    cat("\n╔══════════════════════════════════════════════════════════════╗\n")
-    cat("║                    ESTIMATION COMPLETE                       ║\n")
-    cat("╚══════════════════════════════════════════════════════════════╝\n")
-    cat(sprintf("Total time: %.2f seconds (%.0f voxels/second)\n",
-                total_time, n_vox / total_time))
-    cat(sprintf("Final mean R²: %.3f\n", mean(r_squared)))
-  }
-  
-  # Create fit quality object
-  fit_quality <- list(
-    r_squared = r_squared,
-    mean_r2 = mean(r_squared),
-    min_r2 = min(r_squared),
-    max_r2 = max(r_squared),
-    rmse = NA  # TODO: Compute RMSE properly using fitted values
-  )
-  
-  # Create comprehensive metadata
-  metadata <- list(
-    call = match.call(),
-    n_voxels = n_vox,
-    n_timepoints = n_time,
-    hrf_model = parametric_hrf,
-    theta_seed = if(is.character(theta_seed)) theta_seed else as.numeric(theta_seed),
-    theta_bounds = theta_bounds,
-    settings = list(
-      global_refinement = global_refinement,
-      global_passes = global_passes,
-      kmeans_refinement = kmeans_refinement,
-      kmeans_k = kmeans_k,
-      tiered_refinement = tiered_refinement,
-      parallel = parallel,
-      n_cores = n_cores,
-      safety_mode = safety_mode
-    ),
-    parallel_info = if (!is.null(parallel_config)) list(
-      backend = parallel_config$backend,
-      n_cores = parallel_config$n_cores
-    ) else list(
-      backend = "sequential",
-      n_cores = 1
-    ),
-    timing = list(
-      total_seconds = total_time,
-      voxels_per_second = n_vox / total_time
-    ),
-    version = "ultimate_impeccable_v1.0",
-    kmeans_info = list(
-      applied = kmeans_refinement && kmeans_k > 1,
-      n_clusters = kmeans_k,
-      total_iterations = kmeans_iterations
-    )
-  )
-
-  # Clean up parallel backend
-  if (!is.null(parallel_config)) {
-    parallel_config$cleanup()
-  }
-
-  # Ensure theta_current is a proper matrix
-  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-    theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
-  }
-  
-  # Ensure proper column names
-  if (is.null(colnames(theta_current))) {
-    colnames(theta_current) <- hrf_interface$parameter_names
-  }
-  
-  # Ensure theta_current is still a matrix before creating fit object
-  if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-    theta_current <- matrix(theta_current, nrow = n_vox, ncol = length(hrf_interface$parameter_names))
-    colnames(theta_current) <- hrf_interface$parameter_names
-  }
-  
-  # Create and return parametric_hrf_fit object
-  fit <- new_parametric_hrf_fit(
-    estimated_parameters = theta_current,
-    amplitudes = as.numeric(amplitudes),
-    parameter_names = hrf_interface$parameter_names,
-    hrf_model = parametric_hrf,
-    r_squared = r_squared,
-    residuals = core_result$residuals,
-    parameter_ses = se_theta,
-    convergence_info = convergence_info,
-    metadata = metadata
-  )
-  
-  # Add additional components
-  fit$standard_errors <- se_theta
-  fit$se_amplitudes <- se_amplitudes
-  fit$fit_quality <- fit_quality
-  # Only overwrite refinement_info if we have a non-NULL value
-  if (!is.null(refinement_info)) {
-    fit$refinement_info <- refinement_info
-  }
-  
-  return(fit)
-}
-
-# Helper function to create HRF interface
-.create_hrf_interface <- function(model = "lwu") {
-  .get_hrf_interface(model)
-}
-
-
-# ========== HELPER FUNCTION IMPLEMENTATIONS ==========
-
-# MISSING FUNCTION 1: Parallel engine
-
-.parametric_engine_parallel <- function(Y_proj, S_target_proj, hrf_eval_times,
-                                       hrf_interface, theta_seed, theta_bounds,
-                                       lambda_ridge = 0.01, parallel_config,
-                                       epsilon_beta = 1e-6) {
-
-  n_vox <- ncol(Y_proj)
-  n_params <- length(hrf_interface$parameter_names)
-
-  # Processing function for a chunk of voxels
-  process_chunk <- function(voxel_idx) {
-    res <- .parametric_engine(
-      Y_proj = Y_proj[, voxel_idx, drop = FALSE],
-      S_target_proj = S_target_proj,
-      hrf_eval_times = hrf_eval_times,
-      hrf_interface = hrf_interface,
-      theta_seed = theta_seed,
-      theta_bounds = theta_bounds,
-      lambda_ridge = lambda_ridge,
-      epsilon_beta = epsilon_beta,
-      verbose = FALSE
-    )
-    list(list(indices = voxel_idx, theta_hat = res$theta_hat, beta0 = res$beta0))
-  }
-
-  # Run using the generic parallel backend
-  chunk_results <- .parallel_voxel_processing(
-    voxel_indices = seq_len(n_vox),
-    process_function = process_chunk,
-    parallel_config = parallel_config,
-    chunk_size = "auto",
-    progress = FALSE
-  )
-
-  # Combine results
-  theta_hat <- matrix(NA_real_, n_vox, n_params)
-  beta0 <- numeric(n_vox)
-
-  for (res in chunk_results) {
-    theta_hat[res$indices, ] <- res$theta_hat
-    beta0[res$indices] <- res$beta0
-  }
-
-  list(theta_hat = theta_hat, beta0 = beta0)
-}
-
-# MISSING FUNCTION 2: Standard errors via Delta method
-.compute_standard_errors_delta <- function(theta_hat, beta0, Y_proj, S_target_proj,
-                                          hrf_interface, hrf_eval_times) {
-  n_vox <- ncol(Y_proj)
-  n_params <- length(hrf_interface$parameter_names)
-  n_time <- nrow(Y_proj)
-
-  # Ensure theta_hat is a matrix
-  if (!is.matrix(theta_hat) || length(dim(theta_hat)) != 2) {
-    theta_hat <- matrix(theta_hat, nrow = n_vox, ncol = n_params,
-                        byrow = FALSE)
-    colnames(theta_hat) <- hrf_interface$parameter_names
-  }
-  
-  basis_list <- vector("list", n_vox)
-  hrf_list <- vector("list", n_vox)
-  for (v in seq_len(n_vox)) {
-    theta_v <- theta_hat[v, ]
-    taylor_basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
-    if (!is.matrix(taylor_basis)) {
-      taylor_basis <- matrix(taylor_basis, ncol = n_params + 1)
-    }
-    basis_list[[v]] <- taylor_basis[, -1, drop = FALSE]
-    hrf_list[[v]] <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
-  }
-
-  res <- compute_standard_errors_bulk_cpp(
-    basis_list, hrf_list, Y_proj, S_target_proj, as.numeric(beta0)
-  )
-
-  return(res)
-}
-
-
-# DATA-DRIVEN INITIALIZATION
-#'
-#' Compute data-driven initial HRF parameters
-#'
-#' Estimates latency and width by cross-correlating the average high-variance
-#' voxels with the stimulus.
-#'
-#' @param Y BOLD signal matrix (time x voxels)
-#' @param S Stimulus design matrix
-#' @param hrf_interface HRF model interface
-#' @param theta_bounds List with parameter lower and upper bounds
-#'
-#' @return Numeric vector of initial parameter estimates
-#' @keywords internal
-.compute_data_driven_seed <- function(Y, S, hrf_interface, theta_bounds) {
-  default_seed <- hrf_interface$default_seed()
-  bounds <- theta_bounds
-
-  # Average high variance voxels
-  vars <- apply(Y, 2, var)
-  idx <- which(vars >= quantile(vars, 0.75))
-  y_mean <- rowMeans(Y[, idx, drop = FALSE])
-
-  # Cross correlation with stimulus
-  lags <- seq(-8, 12, by = 1)
-  cors <- vapply(lags, function(l) {
-    if (l >= 0) {
-      s_shift <- c(rep(0, l), S[, 1])[1:nrow(S)]
-    } else {
-      s_shift <- c(S[, 1], rep(0, -l))[(-l + 1):nrow(S)]
-    }
-    stats::cor(y_mean, s_shift, use = "complete.obs")
-  }, numeric(1))
-
-  best_lag <- lags[which.max(abs(cors))]
-  tau_est <- default_seed[1] + best_lag
-  tau_est <- max(bounds$lower[1], min(bounds$upper[1], tau_est))
-
-  cors_abs <- abs(cors)
-  half <- max(cors_abs) * 0.5
-  width_idx <- which(cors_abs >= half)
-  sigma_est <- if (length(width_idx) >= 2) diff(range(lags[width_idx]))/2 else default_seed[2]
-  sigma_est <- max(bounds$lower[2], min(bounds$upper[2], sigma_est))
-
-  c(tau_est, sigma_est, default_seed[3])
-}
-
-# K-MEANS INITIALIZATION
-#'
-#' Initialize HRF parameters with K-means clustering
-#'
-#' Voxels are clustered by their estimated latency from cross-correlation and
-#' cluster-specific seeds are derived.
-#'
-#' @param Y BOLD signal matrix
-#' @param S Stimulus design matrix
-#' @param k Number of clusters
-#' @param hrf_interface HRF model interface
-#' @param theta_bounds List with parameter lower and upper bounds
-#'
-#' @return List with cluster assignments and center parameter seeds
-#' @keywords internal
-.perform_kmeans_initialization <- function(Y, S, k, hrf_interface, theta_bounds) {
-  n_vox <- ncol(Y)
-  if (k <= 1 || n_vox <= k) {
-    return(list(cluster = rep(1, n_vox),
-                centers = matrix(hrf_interface$default_seed(), nrow = 1)))
-  }
-
-  bounds <- theta_bounds
-  delays <- seq(-8, 12, by = 1)
-  n_time <- nrow(Y)
-
-  # Matrix-based cross-correlation for all voxels simultaneously
-  stim <- S[, 1]
-  stim_shifts <- vapply(delays, function(l) {
-    if (l >= 0) {
-      c(rep(0, l), stim)[1:n_time]
-    } else {
-      c(stim, rep(0, -l))[(-l + 1):n_time]
-    }
-  }, numeric(n_time))
-
-  Y_cent <- scale(Y, center = TRUE, scale = FALSE)
-  stim_cent <- scale(stim_shifts, center = TRUE, scale = FALSE)
-  Y_sd <- sqrt(colSums(Y_cent^2) / (n_time - 1))
-  stim_sd <- sqrt(colSums(stim_cent^2) / (n_time - 1))
-
-  cors_mat <- (t(Y_cent) %*% stim_cent) / (n_time - 1)
-  cors_mat <- sweep(cors_mat, 1, Y_sd, "/")
-  cors_mat <- sweep(cors_mat, 2, stim_sd, "/")
-
-  tau_est <- delays[max.col(abs(cors_mat), ties.method = "first")]
-
-  features <- matrix(tau_est, ncol = 1)
-  km <- kmeans(features, centers = k, nstart = 20, iter.max = 50)
-
-  centers <- matrix(rep(hrf_interface$default_seed(), k), nrow = k, byrow = TRUE)
-  for (cl in seq_len(k)) {
-    idx <- which(km$cluster == cl)
-    if (length(idx) > 0) {
-      centers[cl, 1] <- median(tau_est[idx])
-    }
-  }
-  centers[, 1] <- pmax(bounds$lower[1], pmin(bounds$upper[1], centers[, 1]))
-
-  list(cluster = km$cluster, centers = centers, iterations = km$iter)
-}
-
-.compute_r_squared <- function(Y, Y_pred) {
-  ss_res <- colSums((Y - Y_pred)^2)
-  ss_tot <- colSums(scale(Y, scale = FALSE)^2)
-  r2 <- 1 - ss_res / pmax(ss_tot, .Machine$double.eps)
-  pmax(0, pmin(1, r2))
-}
-
-.classify_voxels_for_refinement <- function(r_squared, se_theta, thresholds) {
-  classes <- rep("moderate", length(r_squared))
-  
-  # Easy: high R² and low SE
-  easy_mask <- r_squared > thresholds$r2_easy & 
-               rowMeans(se_theta) < thresholds$se_low
-  classes[easy_mask] <- "easy"
-  
-  # Hard: low R² or high SE
-  hard_mask <- r_squared < thresholds$r2_hard | 
-               rowMeans(se_theta) > thresholds$se_high
-  classes[hard_mask] <- "hard"
-  
-  return(classes)
-}
-
-# Refinement functions
-.refine_moderate_voxels <- function(voxel_idx, Y_proj, S_target_proj,
-                                    theta_current, r_squared,
-                                    hrf_interface, hrf_eval_times,
-                                    theta_bounds = NULL,
-                                    parallel = FALSE,
-                                    n_cores = 1) {
-
-  if (length(voxel_idx) == 0) {
-    return(list(theta_refined = theta_current[voxel_idx, , drop = FALSE],
-                amplitudes = numeric(0)))
-  }
-
-  if (is.null(theta_bounds)) {
-    bounds <- hrf_interface$default_bounds()
-  } else {
-    bounds <- theta_bounds
-  }
-  n_time <- nrow(Y_proj)
-  n_params <- length(hrf_interface$parameter_names)
-
-  theta_block <- theta_current[voxel_idx, , drop = FALSE]
-  id <- apply(theta_block, 1, paste, collapse = ",")
-  groups <- split(seq_along(id), id)
-
-  theta_out <- theta_block
-  amps_out <- numeric(length(voxel_idx))
-
-  for (g in groups) {
-    theta_v <- theta_block[g[1], ]
-    basis <- hrf_interface$taylor_basis(theta_v, hrf_eval_times)
-    if (!is.matrix(basis)) {
-      basis <- matrix(basis, ncol = n_params + 1)
-    }
-    X <- sapply(seq_len(ncol(basis)), function(j) {
-      conv_full <- stats::convolve(S_target_proj[, 1], rev(basis[, j]), type = "open")
-      conv_full[seq_len(n_time)]
-    })
-    qr_decomp <- qr(X)
-    Q <- qr.Q(qr_decomp)
-    R <- qr.R(qr_decomp)
-    Y_block <- Y_proj[, voxel_idx[g], drop = FALSE]
-    coeffs <- solve(R + 0.01 * diag(ncol(R)), t(Q) %*% Y_block)
-    beta0_new <- as.numeric(coeffs[1, ])
-
-    delta <- matrix(0, length(beta0_new), n_params)
-    valid <- abs(beta0_new) >= 1e-6
-    if (any(valid)) {
-      delta[valid, ] <- t(coeffs[2:(n_params + 1), valid, drop = FALSE]) / beta0_new[valid]
-    }
-    theta_new <- sweep(delta, 2, theta_v, FUN = "+")
-    theta_new <- pmax(bounds$lower, pmin(bounds$upper, theta_new))
-
-    fitted <- X %*% coeffs
-    y_means <- colMeans(Y_block)
-    r2_new <- 1 - colSums((Y_block - fitted)^2) /
-      colSums((Y_block - matrix(y_means, n_time, length(g), byrow = TRUE))^2)
-
-    keep <- !is.na(r2_new) & r2_new > r_squared[voxel_idx[g]] & valid
-    theta_out[g[keep], ] <- theta_new[keep, , drop = FALSE]
-    amps_out[g] <- beta0_new
-  }
-
-  list(theta_refined = theta_out, amplitudes = amps_out)
-}
-
-.refine_hard_voxels <- function(voxel_idx, Y_proj, S_target_proj,
-                                theta_current, r_squared,
-                                hrf_interface, hrf_eval_times,
-                                theta_bounds = NULL,
-                                max_iter = 5, parallel = FALSE,
-                                n_cores = 1) {
-
-  if (length(voxel_idx) == 0) {
-    return(list(theta_refined = theta_current[voxel_idx, , drop = FALSE],
-                amplitudes = numeric(0)))
-  }
-
-  n_vox <- ncol(Y_proj)
-  if (is.null(theta_bounds)) {
-    bounds <- hrf_interface$default_bounds()
-  } else {
-    bounds <- theta_bounds
-  }
-  queue_labels <- rep("easy", n_vox)
-  queue_labels[voxel_idx] <- "hard_GN"
-
-  gn <- .gauss_newton_refinement(
-    theta_hat_voxel = theta_current,
-    r2_voxel = r_squared,
-    Y_proj = Y_proj,
-    S_target_proj = S_target_proj,
-    scan_times = seq_len(nrow(Y_proj)),
-    hrf_eval_times = hrf_eval_times,
-    hrf_interface = hrf_interface,
-    theta_bounds = bounds,
-    queue_labels = queue_labels,
-    max_iter_gn = max_iter,
-    verbose = FALSE
-  )
-
-  theta_updated <- gn$theta_hat
-
-  n_time <- nrow(Y_proj)
-  amp_fun <- function(v) {
-    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_updated[v, ])
-    conv_full <- stats::convolve(S_target_proj[, 1], rev(hrf_vals), type = "open")
-    x_pred <- conv_full[seq_len(n_time)]
-    as.numeric(crossprod(x_pred, Y_proj[, v])) / sum(x_pred^2)
-  }
-
-  amps <- vapply(voxel_idx, amp_fun, numeric(1))
-
-  list(
-    theta_refined = theta_updated[voxel_idx, , drop = FALSE],
-    amplitudes = amps,
-    gn_info = list(
-      n_refined = gn$n_refined,
-      n_converged = gn$n_converged,
-      n_improved = gn$n_improved,
-      convergence_status = gn$convergence_status,
-      iteration_counts = gn$iteration_counts
-    )
-  )
+  # DEFAULT: Use refactored implementation
+  do.call(.run_hrf_estimation_engine, args)
 }

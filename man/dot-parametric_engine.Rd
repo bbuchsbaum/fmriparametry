@@ -31,7 +31,7 @@
 
 \item{lambda_ridge}{Numeric ridge penalty (default: 0.01)}
 
-\item{epsilon_beta}{Small value to avoid division by zero when beta0 is extremely small (default: 1e-06)}
+\item{epsilon_beta}{Small value to avoid division by zero when beta0 is extremely small (default: 1e-6)}
 
 \item{verbose}{Logical whether to print progress (default: FALSE)}
 }
@@ -49,5 +49,9 @@ List with elements:
 Core implementation of the Taylor approximation method for parametric HRF estimation.
 This is the main workhorse function that performs voxel-wise parameter estimation.
 }
-\note{This engine assumes evenly spaced scan times (constant TR). If acquisition times vary, adjust the stimulus design or interpolate the data before calling this function.}
+\note{
+This engine assumes evenly spaced scan times (constant TR).
+If acquisition times vary, adjust the stimulus design or
+interpolate the data before calling this function.
+}
 \keyword{internal}

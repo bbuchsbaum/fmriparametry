@@ -31,9 +31,23 @@ single_voxel_sanity_check <- function(
   Y <- matrix(as.numeric(y), ncol = 1)
   S <- matrix(as.numeric(onsets), ncol = 1)
 
-  hrf_interface <- .get_hrf_interface(parametric_hrf)
-  theta_seed <- hrf_interface$default_seed()
-  theta_bounds <- hrf_interface$default_bounds()
+  # Get base HRF interface
+  base_interface <- .get_hrf_interface(parametric_hrf)
+  theta_seed <- base_interface$default_seed()
+  theta_bounds <- base_interface$default_bounds()
+
+  # Create properly wrapped HRF interface with bounds
+  hrf_interface <- list(
+    hrf_function = function(t, params_vector, ...) {
+      base_interface$hrf_function(t, params_vector, bounds = theta_bounds, ...)
+    },
+    taylor_basis = function(params_vector0, t_hrf_eval, ...) {
+      base_interface$taylor_basis(params_vector0, t_hrf_eval, bounds = theta_bounds, ...)
+    },
+    parameter_names = base_interface$parameter_names,
+    default_seed = base_interface$default_seed,
+    default_bounds = base_interface$default_bounds
+  )
 
   .parametric_engine(
     Y_proj = Y,
@@ -43,6 +57,7 @@ single_voxel_sanity_check <- function(
     theta_seed = theta_seed,
     theta_bounds = theta_bounds,
     lambda_ridge = lambda_ridge,
-    verbose = verbose
+    verbose = verbose,
+    baseline_model = "intercept"
   )
 }

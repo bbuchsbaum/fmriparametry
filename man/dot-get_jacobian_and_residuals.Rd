@@ -7,10 +7,7 @@
 .get_jacobian_and_residuals(theta, y, S, t_hrf, hrf_interface, n_time)
 }
 \description{
-Get Jacobian matrix and residuals for Gauss-Newton
-}
-\details{
-Returns \code{NULL} when the amplitude denominator \eqn{\sum x\_hrf^2} is
-effectively zero, indicating a singular system.
+Returns \code{NULL} if the HRF predictor has near-zero magnitude, which
+indicates a singular system.
 }
 \keyword{internal}

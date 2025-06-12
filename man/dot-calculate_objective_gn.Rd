@@ -7,10 +7,8 @@
 .calculate_objective_gn(theta, y, S, t_hrf, hrf_interface, n_time)
 }
 \description{
-Calculate objective function for Gauss-Newton
-}
-\details{
-Returns \code{Inf} when the amplitude denominator \eqn{\sum x\_pred\_raw^2}
-is effectively zero, indicating a singular system.
+Returns \code{Inf} if the HRF predictor has near-zero magnitude, which
+indicates that the system is singular and the amplitude cannot be
+estimated reliably.
 }
 \keyword{internal}

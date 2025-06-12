@@ -49,6 +49,9 @@
   if (any(!is.finite(X))) stop("X contains non-finite values")
   if (any(!is.finite(Y))) stop("Y contains non-finite values")
 
+  # Ensure numeric storage mode for C++ compatibility
+  storage.mode(X) <- "double"
+  storage.mode(Y) <- "double"
 
   # Validate ridge penalty
   lambda_ridge <- .validate_numeric_param(

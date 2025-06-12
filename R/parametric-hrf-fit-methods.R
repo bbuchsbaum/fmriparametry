@@ -17,6 +17,16 @@ NULL
 #' @param ... Additional arguments (ignored)
 #' @return The input object invisibly
 #' @export
+#' @examples
+#' \dontrun{
+#' # Assuming 'fit' is a parametric_hrf_fit object from estimate_parametric_hrf()
+#' print(fit)
+#' 
+#' # Shows summary information about the fit including:
+#' # - Number of voxels and parameters
+#' # - Mean R-squared
+#' # - Parameter ranges
+#' }
 print.parametric_hrf_fit <- function(x, ...) {
   cat("Parametric HRF Fit\n")
   cat("==================\n")
@@ -92,6 +102,16 @@ print.parametric_hrf_fit <- function(x, ...) {
 #' @param ... Additional arguments
 #' @return A list with class `summary.parametric_hrf_fit`
 #' @export
+#' @examples
+#' \dontrun{
+#' # Create a summary of the fit
+#' fit_summary <- summary(fit)
+#' print(fit_summary)
+#' 
+#' # Access summary components
+#' fit_summary$parameter_summary  # Statistics for each parameter
+#' fit_summary$r_squared_summary  # R-squared distribution
+#' }
 summary.parametric_hrf_fit <- function(object, ...) {
   param_sum <- apply(object$estimated_parameters, 2, summary)
   amp_sum <- summary(object$amplitudes)
@@ -216,6 +236,18 @@ print.summary_parametric_hrf_fit <- function(x, ...) {
 #' @param ... Additional arguments (ignored)
 #' @return A numeric matrix or vector depending on `type`
 #' @export
+#' @examples
+#' \dontrun{
+#' # Get HRF parameters (tau, sigma, rho for LWU model)
+#' params <- coef(fit)
+#' head(params)
+#' 
+#' # Get amplitudes
+#' amps <- coef(fit, type = "amplitude")
+#' 
+#' # Get standard errors
+#' ses <- coef(fit, type = "se")
+#' }
 coef.parametric_hrf_fit <- function(object,
                                    type = c("parameters", "amplitude", "se"),
                                    ...) {
@@ -288,6 +320,20 @@ vcov.parametric_hrf_fit <- function(object, voxel_index, ...) {
 #' @param ... Additional arguments passed to plotting functions
 #' @return A ggplot object or list of plots depending on `type`
 #' @export
+#' @examples
+#' \dontrun{
+#' # Plot HRFs for voxels at different R² quantiles
+#' plot(fit, type = "hrf", n_curves = 5)
+#' 
+#' # Plot parameter distributions
+#' plot(fit, type = "parameters")
+#' 
+#' # Create diagnostic plots
+#' plot(fit, type = "diagnostic")
+#' 
+#' # Plot specific voxels
+#' plot(fit, type = "hrf", voxels = c(1, 10, 100))
+#' }
 plot.parametric_hrf_fit <- function(x,
                                     type = c("hrf", "parameters", "diagnostic", "refinement"),
                                     voxels = NULL,
@@ -316,7 +362,8 @@ plot.parametric_hrf_fit <- function(x,
   hrf_curves <- matrix(NA, nrow = length(t_hrf), ncol = length(voxels))
 
   if (x$hrf_model == "lwu") {
-    hrf_fn <- .lwu_hrf_function
+    bounds <- .lwu_hrf_default_bounds()
+    hrf_fn <- function(t, params) .lwu_hrf_function(t, params, bounds)
   }
 
   for (i in seq_along(voxels)) {
@@ -454,6 +501,15 @@ plot.parametric_hrf_fit <- function(x,
 #' @param ... Additional arguments (ignored)
 #' @return Numeric matrix of residuals or NULL
 #' @export
+#' @examples
+#' \dontrun{
+#' # Get residuals from the fit
+#' resids <- residuals(fit)
+#' 
+#' # Check residual properties
+#' hist(resids[, 1])  # Histogram for first voxel
+#' qqnorm(resids[, 1])  # Q-Q plot
+#' }
 residuals.parametric_hrf_fit <- function(object, ...) {
   if (is.null(object$residuals)) {
     warning("No residuals stored in the fit object")
@@ -528,6 +584,7 @@ predict.parametric_hrf_fit <- function(object,
   }
 
   hrf_interface <- .get_hrf_interface(object$hrf_model)
+  bounds <- hrf_interface$default_bounds()
   n_time <- nrow(newdata)
   result <- matrix(NA_real_, nrow = n_time, ncol = length(voxel_indices))
 
@@ -535,7 +592,7 @@ predict.parametric_hrf_fit <- function(object,
     v <- voxel_indices[i]
     theta_v <- object$estimated_parameters[v, ]
     beta0_v <- object$amplitudes[v]
-    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v, bounds = bounds)
     conv <- .batch_convolution(newdata, matrix(hrf_vals, ncol = 1), n_time)
     result[, i] <- beta0_v * conv[, 1]
   }

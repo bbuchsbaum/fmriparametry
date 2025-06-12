@@ -286,7 +286,8 @@
       theta_seed = theta_local,
       theta_bounds = theta_bounds,
       lambda_ridge = lambda_ridge,
-      verbose = FALSE
+      verbose = FALSE,
+      baseline_model = "intercept"
     )
     
     # Return update info

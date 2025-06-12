@@ -1,0 +1,102 @@
+# Dead Code Analysis Report
+Generated: 2025-06-09
+
+## Summary
+- Total functions analyzed: 90
+- Never called: 54
+- Only in tests: 13
+- Suspicious names: 0
+
+## Detailed Results
+
+### Complete Function Analysis
+- `.assert_output_quality` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.batch_convolution` (batch_convolution.R) - Internal, 2 calls
+- `.bayesian_engine` (bayesian_engine.R) - Test only, 2 calls
+- `.calculate_objective_gn` (gauss-newton-refinement.R) - Internal, 2 calls
+- `.check_memory_available` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.classify_refinement_queue` (refinement-queue.R) - Test only, 1 calls
+- `.classify_voxels_for_refinement` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.compute_data_driven_seed` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.compute_r_squared` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.compute_standard_errors_delta` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.create_hrf_interface` (estimate_parametric_hrf.R) - Test only, 2 calls
+- `.diag_abort` (diagnostics.R) - **NEVER CALLED**, 0 calls
+- `.diag_inform` (diagnostics.R) - **NEVER CALLED**, 0 calls
+- `.diag_progressor` (diagnostics.R) - **NEVER CALLED**, 0 calls
+- `.diag_warn` (diagnostics.R) - **NEVER CALLED**, 0 calls
+- `.fast_batch_convolution` (fast_batch_convolution.R) - Exported, 1 calls
+- `.gauss_newton_refinement` (gauss-newton-refinement.R) - Internal, 2 calls
+- `.get_available_memory` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.get_hrf_interface` (hrf-registry.R) - Internal, 3 calls
+- `.get_jacobian_and_residuals` (gauss-newton-refinement.R) - Internal, 1 calls
+- `.local_recentering_moderate` (local-recentering.R) - **NEVER CALLED**, 0 calls
+- `.lwu_hrf_default_bounds` (hrf-interface-lwu.R) - Test only, 1 calls
+- `.lwu_hrf_default_seed` (hrf-interface-lwu.R) - Test only, 1 calls
+- `.lwu_hrf_function` (hrf-interface-lwu.R) - Test only, 3 calls
+- `.lwu_hrf_parameter_names` (hrf-interface-lwu.R) - Internal, 3 calls
+- `.lwu_hrf_taylor_basis_function` (hrf-interface-lwu.R) - **NEVER CALLED**, 0 calls
+- `.on_load_options` (fmriparametric-package.R) - **NEVER CALLED**, 0 calls
+- `.onLoad` (zzz.R) - **NEVER CALLED**, 0 calls
+- `.onUnload` (zzz.R) - **NEVER CALLED**, 0 calls
+- `.parallel_gauss_newton` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `.parallel_kmeans_processing` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `.parallel_local_recentering` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `.parallel_se_calculation` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `.parallel_voxel_processing` (parallel-processing.R) - Internal, 1 calls
+- `.parametric_engine` (parametric-engine.R) - Internal, 5 calls
+- `.parametric_engine_parallel` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.perform_kmeans_initialization` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `.plot_diagnostic` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `.plot_hrf` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `.plot_parameters` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `.plot_refinement` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `.prepare_parametric_inputs` (prepare-parametric-inputs.R) - Internal, 1 calls
+- `.print_refinement_summary` (refinement-queue.R) - Test only, 1 calls
+- `.refine_hard_voxels` (estimate_parametric_hrf.R) - Test only, 1 calls
+- `.refine_moderate_voxels` (estimate_parametric_hrf.R) - Test only, 1 calls
+- `.ridge_linear_solve` (ridge_linear_solver.R) - Internal, 2 calls
+- `.rock_solid_validate_inputs` (validation-helpers.R) - Internal, 1 calls
+- `.safe_divide` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.safe_solve` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.setup_parallel_backend` (parallel-processing.R) - Internal, 1 calls
+- `.svd_pinv` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.try_with_context` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `.validate_constraints` (engineering-standards.R) - **NEVER CALLED**, 0 calls
+- `.validate_event_model` (validation-helpers.R) - Internal, 1 calls
+- `.validate_fmri_data` (validation-helpers.R) - Internal, 1 calls
+- `.validate_input` (engineering-standards.R) - Internal, 1 calls
+- `.validate_numeric_param` (validation-helpers.R) - Internal, 1 calls
+- `.validate_theta_bounds` (validation-helpers.R) - Internal, 1 calls
+- `.with_timing` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `amp_fun` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `calculate_se_voxel` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `cleanup` (parallel-processing.R) - Internal, 1 calls
+- `coef.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `compute_standard_errors_bulk_cpp` (RcppExports.R) - Internal, 1 calls
+- `error` (internal-utils.R) - **NEVER CALLED**, 0 calls
+- `estimate_parametric_hrf` (estimate_parametric_hrf.R) - Test only, 9 calls
+- `fast_batch_convolution_cpp` (RcppExports.R) - Internal, 1 calls
+- `fitted.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `fmriparametric_api_version` (api-version.R) - **NEVER CALLED**, 0 calls
+- `get_fitted_values` (parametric-hrf-fit-class.R) - **NEVER CALLED**, 0 calls
+- `get_one_vcov` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `get_timing_report` (internal-utils.R) - Test only, 1 calls
+- `is_v2_fit` (parametric-hrf-fit-class.R) - **NEVER CALLED**, 0 calls
+- `n_timepoints` (parametric-hrf-fit-class.R) - **NEVER CALLED**, 0 calls
+- `n_voxels` (parametric-hrf-fit-class.R) - **NEVER CALLED**, 0 calls
+- `new_parametric_hrf_fit` (parametric-hrf-fit-class.R) - Internal, 2 calls
+- `plot.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `predict.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `print.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `print.summary_parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `process_chunk` (estimate_parametric_hrf.R) - **NEVER CALLED**, 0 calls
+- `process_hard_voxel` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `process_voxel` (parallel-processing.R) - **NEVER CALLED**, 0 calls
+- `register_hrf_model` (hrf-registry.R) - Test only, 1 calls
+- `residuals.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `ridge_linear_solve_cpp` (RcppExports.R) - Internal, 1 calls
+- `set_engineering_options` (engineering-standards.R) - **NEVER CALLED**, 0 calls
+- `single_voxel_sanity_check` (single_voxel_sanity_check.R) - Test only, 1 calls
+- `summary.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls
+- `vcov.parametric_hrf_fit` (parametric-hrf-fit-methods.R) - **NEVER CALLED**, 0 calls

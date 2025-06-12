@@ -1,3 +1,6 @@
+# Skip all smart parallel decision tests - function is in attic for a reason
+skip("Smart parallel decision function is in attic - skipping all tests")
+
 test_that(".smart_parallel_decision respects system configuration", {
   # Test with small n_voxels
   res <- fmriparametric:::.smart_parallel_decision(n_voxels = 10)

@@ -76,7 +76,13 @@ estimate_parametric_hrf(
 
 \item{compute_se}{Logical: compute standard errors?}
 
-\item{safety_mode}{Character: "maximum", "balanced", or "performance"}
+\item{safety_mode}{Character: "maximum", "balanced", or "performance".
+Determines the level of input validation. "maximum" triggers
+comprehensive checks, "balanced" performs standard checks, and
+"performance" uses minimal validation.
+
+The chosen level controls which helper functions (e.g.,
+\code{.validate_fmri_data}) are executed before fitting.}
 
 \item{progress}{Logical: show progress bar?}
 
@@ -98,7 +104,9 @@ Convergence summaries include global iteration counts and, when tiered refinemen
 \description{
 Estimate hemodynamic response function parameters from fMRI time series using
 a parametric HRF model. Optional refinement steps improve fits for challenging
-voxels.
+voxels. The core engine performs a single Taylor approximation pass around
+the provided parameter seed. Additional stages can iteratively update this
+seed and apply specialized refinement algorithms.
 }
 \section{Package Options}{
 
@@ -106,8 +114,10 @@ Global iterative refinement (Stage 3) is controlled by the option
 \code{fmriparametric.refine_global}. Set to \code{FALSE} to disable global re-centering
 for all calls.
 }
+
 \section{Iteration and Convergence}{
-The core estimation stage performs a single Taylor approximation pass around the starting parameters. When \code{global_refinement = TRUE}, this seed is iteratively updated for up to \code{global_passes} iterations until the maximum parameter change is below \code{convergence_epsilon}. Optional K-means initialization supplies alternative seeds before this loop. Tiered refinement applies local recentering or Gauss-Newton optimization with its own iteration limits such as \code{refinement_thresholds$gauss_newton_maxiter}.
+
+The core engine runs a single Taylor pass around \code{theta_seed}. If \code{global_refinement = TRUE}, the seed is updated for up to \code{global_passes} iterations until the maximum parameter change is below \code{convergence_epsilon}. K-means initialization can provide alternative seeds before this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization with its own iteration limits (e.g. \code{refinement_thresholds$gauss_newton_maxiter}).
 }
 
 \examples{

@@ -25,6 +25,9 @@
     conv_time <- mvfft(conv_fft, inverse = TRUE) / n_fft
     return(Re(conv_time[seq_len(output_length), , drop = FALSE]))
   } else {
+    # Ensure inputs are double-precision for C++
+    storage.mode(signal) <- "double"
+    storage.mode(kernels) <- "double"
     return(fast_batch_convolution_cpp(signal, kernels, output_length))
   }
 }

@@ -11,7 +11,8 @@ test_that("single_voxel_sanity_check recovers HRF shape", {
 
   true_theta <- c(tau = 6, sigma = 2.5, rho = 0.4)
   t_hrf <- seq(0, 30, by = 0.5)
-  true_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, true_theta)
+  bounds <- fmriparametric:::.lwu_hrf_default_bounds()
+  true_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, true_theta, bounds)
 
   conv_full <- stats::convolve(onsets, rev(true_hrf), type = "open")
   signal <- conv_full[1:n_time]
@@ -19,7 +20,7 @@ test_that("single_voxel_sanity_check recovers HRF shape", {
 
   fit <- single_voxel_sanity_check(y, onsets, hrf_eval_times = t_hrf)
 
-  est_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, fit$theta_hat)
+  est_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, fit$theta_hat, bounds)
   cor_hrf <- cor(est_hrf, true_hrf)
 
   expect_true(cor_hrf > 0.9)
@@ -35,7 +36,8 @@ test_that("estimate_parametric_hrf recovers single voxel HRF", {
 
   true_theta <- c(tau = 5.5, sigma = 2.0, rho = 0.3)
   t_hrf <- seq(0, 30, by = 0.5)
-  true_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, true_theta)
+  bounds <- fmriparametric:::.lwu_hrf_default_bounds()
+  true_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, true_theta, bounds)
 
   conv_full <- stats::convolve(onsets, rev(true_hrf), type = "open")
   signal <- conv_full[1:n_time]
@@ -50,7 +52,7 @@ test_that("estimate_parametric_hrf recovers single voxel HRF", {
   )
 
   params <- as.numeric(coef(fit))
-  est_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, params)
+  est_hrf <- fmriparametric:::.lwu_hrf_function(t_hrf, params, bounds)
   cor_hrf <- cor(est_hrf, true_hrf)
 
   expect_true(cor_hrf > 0.9)

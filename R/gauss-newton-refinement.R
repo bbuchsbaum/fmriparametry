@@ -80,15 +80,46 @@
     y_v <- Y_proj[, v]
     
     # Initialize with current estimate
-    theta_current <- theta_hat_voxel[v, ]
+    if (v > nrow(theta_hat_voxel)) {
+      warning(sprintf("Gauss-Newton: Voxel index %d exceeds matrix rows %d", v, nrow(theta_hat_voxel)))
+      convergence_status[i] <- "invalid_index"
+      iteration_counts[i] <- 0
+      next
+    }
+    
+    theta_current <- theta_hat_voxel[v, , drop = TRUE]
+    
+    # Validate extraction
+    if (length(theta_current) == 0 || length(theta_current) != n_params) {
+      warning(sprintf("Gauss-Newton: Invalid theta extraction for voxel %d (got length %d, expected %d)",
+                     v, length(theta_current), n_params))
+      cat("Debug - theta_hat_voxel dimensions:", dim(theta_hat_voxel), "\n")
+      cat("Debug - voxel index:", v, "\n")
+      convergence_status[i] <- "invalid_input"
+      iteration_counts[i] <- 0
+      next
+    }
+    
+    # Ensure theta_current is a numeric vector
+    if (is.matrix(theta_current)) {
+      theta_current <- as.numeric(theta_current)
+    }
     theta_best <- theta_current
     r2_best <- r2_voxel[v]
     
     # Calculate initial objective
-    obj_current <- .calculate_objective_gn(
-      theta_current, y_v, S_target_proj, hrf_eval_times,
-      hrf_interface, n_time
-    )
+    obj_current <- tryCatch({
+      .calculate_objective_gn(
+        theta_current, y_v, S_target_proj, hrf_eval_times,
+        hrf_interface, n_time
+      )
+    }, error = function(e) {
+      warning(sprintf("GN: Error in initial objective for voxel %d: %s", v, e$message))
+      cat("Debug - theta_current:", theta_current, "\n")
+      cat("Debug - y_v length:", length(y_v), "\n")
+      cat("Debug - S_target_proj dim:", dim(S_target_proj), "\n")
+      Inf
+    })
 
     if (is.infinite(obj_current)) {
       convergence_status[i] <- "singular_system"
@@ -130,8 +161,19 @@
         NULL
       })
       
-      if (is.null(delta)) {
+      if (is.null(delta) || length(delta) == 0) {
         convergence_status[i] <- "singular_system"
+        break
+      }
+      
+      # Ensure delta is numeric vector of correct length
+      if (is.matrix(delta)) {
+        delta <- as.numeric(delta)
+      }
+      
+      if (length(delta) != n_params) {
+        warning(sprintf("GN: Invalid delta length %d (expected %d)", length(delta), n_params))
+        convergence_status[i] <- "numerical_error"
         break
       }
       
@@ -142,17 +184,61 @@
       
       for (ls_iter in 1:10) {
         # Proposed update
-        theta_proposal <- theta_current + alpha * as.numeric(delta)
+        # Ensure both are numeric vectors
+        if (!is.numeric(theta_current)) theta_current <- as.numeric(theta_current)
+        if (!is.numeric(delta)) delta <- as.numeric(delta)
+        
+        theta_proposal <- theta_current + alpha * delta
+        
+        # Debug check
+        if (length(theta_proposal) == 0) {
+          warning(sprintf("GN Debug: theta_proposal is empty! theta_current length=%d, delta length=%d, alpha=%f",
+                         length(theta_current), length(delta), alpha))
+          cat("theta_current:", theta_current, "\n")
+          cat("delta:", delta, "\n")
+          cat("class(theta_current):", class(theta_current), "\n")
+          cat("class(delta):", class(delta), "\n")
+          break
+        }
+        
+        # Validate theta_proposal 
+        if (length(theta_proposal) != n_params) {
+          warning(sprintf("Gauss-Newton: Invalid theta_proposal length %d (expected %d) in line search",
+                         length(theta_proposal), n_params))
+          convergence_status[i] <- "numerical_error"
+          singular <- TRUE
+          break
+        }
         
         # Apply bounds
-        theta_proposal <- pmax(theta_bounds$lower, 
-                               pmin(theta_proposal, theta_bounds$upper))
+        theta_proposal_bounded <- pmax(theta_bounds$lower, 
+                                       pmin(theta_proposal, theta_bounds$upper))
+        
+        # Check if bounds application caused issues
+        if (length(theta_proposal_bounded) != length(theta_proposal)) {
+          warning("Bounds application changed vector length!")
+          cat("Before bounds:", theta_proposal, "\n")
+          cat("After bounds:", theta_proposal_bounded, "\n")
+          cat("Bounds lower:", theta_bounds$lower, "\n")
+          cat("Bounds upper:", theta_bounds$upper, "\n")
+        }
+        
+        theta_proposal <- theta_proposal_bounded
         
         # Evaluate objective
-        obj_proposal <- .calculate_objective_gn(
-          theta_proposal, y_v, S_target_proj, hrf_eval_times,
-          hrf_interface, n_time
-        )
+        obj_proposal <- tryCatch({
+          .calculate_objective_gn(
+            theta_proposal, y_v, S_target_proj, hrf_eval_times,
+            hrf_interface, n_time
+          )
+        }, error = function(e) {
+          warning(sprintf("GN: Error in line search objective: %s", e$message))
+          cat("Debug - theta_proposal:", theta_proposal, "\n")
+          cat("Debug - theta_current:", theta_current, "\n")
+          cat("Debug - delta:", delta, "\n")
+          cat("Debug - alpha:", alpha, "\n")
+          Inf
+        })
 
         if (is.infinite(obj_proposal)) {
           convergence_status[i] <- "singular_system"
@@ -281,6 +367,14 @@
 #'
 #' @keywords internal
 .calculate_objective_gn <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
+  # Validate theta
+  if (!is.numeric(theta) || length(theta) != length(hrf_interface$parameter_names)) {
+    stop(sprintf("Invalid theta: expected numeric vector of length %d, got %s of length %d",
+                 length(hrf_interface$parameter_names), 
+                 class(theta)[1], 
+                 length(theta)))
+  }
+  
   # Generate HRF at current parameters
   hrf_vals <- hrf_interface$hrf_function(t_hrf, theta)
 
@@ -342,8 +436,11 @@
     dx_dtheta_k <- X_conv[, k + 1]
     
     # Derivative of beta w.r.t. theta_k
+    # beta = (x_hrf' * y) / (x_hrf' * x_hrf)
+    # d(beta)/d(theta_k) requires chain rule through denominator
+    # d(denom)/d(theta_k) = d(x_hrf' * x_hrf)/d(theta_k) = 2 * x_hrf' * dx_dtheta_k
     dbeta_dtheta_k <- (as.numeric(crossprod(dx_dtheta_k, y)) -
-      beta * as.numeric(crossprod(dx_dtheta_k, x_hrf))) / denom
+      2 * beta * as.numeric(crossprod(x_hrf, dx_dtheta_k))) / denom
     
     # Full derivative
     jacobian[, k] <- -beta * dx_dtheta_k - dbeta_dtheta_k * x_hrf

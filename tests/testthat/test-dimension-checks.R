@@ -3,15 +3,15 @@ test_that(".parametric_engine errors on mismatched input sizes", {
   S <- matrix(0, nrow = 9, ncol = 1)
 
   hrf_interface <- list(
-    hrf_function = .lwu_hrf_function,
-    taylor_basis = .lwu_hrf_taylor_basis_function,
-    parameter_names = .lwu_hrf_parameter_names(),
-    default_seed = .lwu_hrf_default_seed(),
-    default_bounds = .lwu_hrf_default_bounds()
+    hrf_function = fmriparametric:::.lwu_hrf_function,
+    taylor_basis = fmriparametric:::.lwu_hrf_taylor_basis_function,
+    parameter_names = fmriparametric:::.lwu_hrf_parameter_names(),
+    default_seed = fmriparametric:::.lwu_hrf_default_seed(),
+    default_bounds = fmriparametric:::.lwu_hrf_default_bounds()
   )
 
   expect_error(
-    .parametric_engine(
+    fmriparametric:::.parametric_engine(
       Y_proj = Y,
       S_target_proj = S,
       hrf_eval_times = seq(0, 30, length.out = 61),

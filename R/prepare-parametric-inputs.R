@@ -92,6 +92,11 @@
     hrf_eval_times <- seq(0, hrf_span, by = dt)
   }
 
+  # Ensure outputs are double for C++ compatibility
+  storage.mode(Y_proj) <- "double"
+  storage.mode(S_target_proj) <- "double"
+  storage.mode(S_target) <- "double"
+
   list(
     Y_raw = Y_raw,
     Y_proj = Y_proj,
@@ -99,6 +104,7 @@
     S_target_proj = S_target_proj,
     Z = Z,
     scan_times = scan_times,
-    hrf_eval_times = hrf_eval_times
+    hrf_eval_times = hrf_eval_times,
+    baseline_model = baseline_model
   )
 }

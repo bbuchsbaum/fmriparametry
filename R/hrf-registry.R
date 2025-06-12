@@ -5,8 +5,12 @@
 
 # Register default LWU interface on load
 .hrf_registry$lwu <- list(
-  hrf_function = .lwu_hrf_function,
-  taylor_basis = .lwu_hrf_taylor_basis_function,
+  hrf_function = function(t, params_vector) {
+    .lwu_hrf_function(t, params_vector, bounds = .lwu_hrf_default_bounds())
+  },
+  taylor_basis = function(params_vector0, t_hrf_eval) {
+    .lwu_hrf_taylor_basis_function(params_vector0, t_hrf_eval, bounds = .lwu_hrf_default_bounds())
+  },
   parameter_names = .lwu_hrf_parameter_names(),
   default_seed = .lwu_hrf_default_seed,
   default_bounds = .lwu_hrf_default_bounds
