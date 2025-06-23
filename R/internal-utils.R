@@ -3,6 +3,11 @@
 # and .check_memory_available() stored in a dedicated environment to
 # avoid accidental masking.
 
+# Default value operator (internal, not documented)
+`%||%` <- function(x, y) {
+  if (is.null(x)) y else x
+}
+
 .fmriparametric_internal <- new.env(parent = emptyenv())
 
 .fmriparametric_internal$try_with_context <- function(expr, context = "", fallback = NULL) {

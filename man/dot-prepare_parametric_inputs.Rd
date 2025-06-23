@@ -8,7 +8,7 @@
   fmri_data,
   event_model,
   confound_formula = NULL,
-  baseline_model = "intercept",
+  baseline_model = NULL,
   hrf_eval_times = NULL,
   hrf_span = 30,
   mask = NULL
@@ -21,7 +21,7 @@
 
 \item{confound_formula}{Optional formula for confound regressors}
 
-\item{baseline_model}{Baseline model specification (unused placeholder)}
+\item{baseline_model}{Either an fmrireg::baseline_model object or "intercept" (default)}
 
 \item{hrf_eval_times}{Optional vector of HRF evaluation times}
 

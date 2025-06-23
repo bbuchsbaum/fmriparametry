@@ -13,7 +13,8 @@
   theta_bounds,
   lambda_ridge = 0.01,
   epsilon_beta = 1e-06,
-  verbose = FALSE
+  verbose = FALSE,
+  baseline_model = NULL
 )
 }
 \arguments{
@@ -34,6 +35,8 @@
 \item{epsilon_beta}{Small value to avoid division by zero when beta0 is extremely small (default: 1e-6)}
 
 \item{verbose}{Logical whether to print progress (default: FALSE)}
+
+\item{baseline_model}{Character string specifying baseline model (default: "intercept")}
 }
 \value{
 List with elements:

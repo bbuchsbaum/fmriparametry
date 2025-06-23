@@ -7,11 +7,11 @@
 estimate_parametric_hrf(
   fmri_data,
   event_model,
-  parametric_hrf = "lwu",
+  parametric_model = "lwu",
   theta_seed = NULL,
   theta_bounds = NULL,
   confound_formula = NULL,
-  baseline_model = "intercept",
+  baseline_model = NULL,
   hrf_eval_times = NULL,
   hrf_span = 30,
   lambda_ridge = 0.01,
@@ -38,15 +38,17 @@ estimate_parametric_hrf(
 
 \item{event_model}{Event timing design matrix or event model object}
 
-\item{parametric_hrf}{Character string specifying HRF model (currently "lwu")}
+\item{parametric_model}{Character string specifying HRF model (currently "lwu")}
 
 \item{theta_seed}{Initial parameters or "data_driven" for automatic selection}
 
 \item{theta_bounds}{List with 'lower' and 'upper' bounds for parameters}
 
-\item{confound_formula}{Optional formula for nuisance regressors}
+\item{confound_formula}{Optional formula for nuisance regressors (deprecated, use baseline_model)}
 
-\item{baseline_model}{Baseline model specification (default "intercept")}
+\item{baseline_model}{Either an fmrireg::baseline_model object for complex confound regression,
+or NULL (default) for no confound regression. When provided as baseline_model object,
+supports drift modeling, motion parameters, and other nuisance regressors.}
 
 \item{hrf_eval_times}{Time points for HRF evaluation}
 
@@ -60,6 +62,8 @@ estimate_parametric_hrf(
 
 \item{global_passes}{Number of global refinement iterations (default 3)}
 
+\item{convergence_epsilon}{Convergence criterion for global refinement (default 0.01)}
+
 \item{kmeans_refinement}{Logical: perform K-means local refinement? (Sprint 3)}
 
 \item{kmeans_k}{Number of clusters for K-means (default 5)}
@@ -68,7 +72,7 @@ estimate_parametric_hrf(
 
 \item{tiered_refinement}{Character: refinement strategy ("none", "moderate", "aggressive")}
 
-\item{refinement_thresholds}{List of R² and SE thresholds for tiered refinement}
+\item{refinement_thresholds}{List of R^2 and SE thresholds for tiered refinement}
 
 \item{parallel}{Logical: use parallel processing?}
 
@@ -79,10 +83,7 @@ estimate_parametric_hrf(
 \item{safety_mode}{Character: "maximum", "balanced", or "performance".
 Determines the level of input validation. "maximum" triggers
 comprehensive checks, "balanced" performs standard checks, and
-"performance" uses minimal validation.
-
-The chosen level controls which helper functions (e.g.,
-\code{.validate_fmri_data}) are executed before fitting.}
+"performance" uses minimal validation.}
 
 \item{progress}{Logical: show progress bar?}
 
@@ -96,7 +97,6 @@ Object of class 'parametric_hrf_fit' containing:
 \item standard_errors: Parameter standard errors (if computed)
 \item fit_quality: List with R-squared and other metrics
 \item convergence_info: Detailed convergence information
-Convergence summaries include global iteration counts and, when tiered refinement is used, Gauss-Newton statistics.
 \item refinement_info: Information about refinement strategies applied
 \item metadata: Complete analysis metadata
 }
@@ -108,6 +108,14 @@ voxels. The core engine performs a single Taylor approximation pass around
 the provided parameter seed. Additional stages can iteratively update this
 seed and apply specialized refinement algorithms.
 }
+\section{Implementation Selection}{
+
+This function uses the Strangler Fig pattern to safely migrate from the
+original monolithic implementation to a modular refactored version.
+The refactored implementation is now the default. Legacy support is available
+temporarily via \code{options(fmriparametric.use_legacy = TRUE)}.
+}
+
 \section{Package Options}{
 
 Global iterative refinement (Stage 3) is controlled by the option
@@ -117,17 +125,43 @@ for all calls.
 
 \section{Iteration and Convergence}{
 
-The core engine runs a single Taylor pass around \code{theta_seed}. If \code{global_refinement = TRUE}, the seed is updated for up to \code{global_passes} iterations until the maximum parameter change is below \code{convergence_epsilon}. K-means initialization can provide alternative seeds before this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization with its own iteration limits (e.g. \code{refinement_thresholds$gauss_newton_maxiter}).
+The core engine runs a single Taylor pass around \code{theta_seed}. If \code{global_refinement = TRUE},
+the seed is updated for up to \code{global_passes} iterations until the maximum parameter change
+is below \code{convergence_epsilon}. K-means initialization can provide alternative seeds before
+this loop. Tiered refinement then applies local re-centering or Gauss-Newton optimization
+with its own iteration limits (e.g. \code{refinement_thresholds$gauss_newton_maxiter}).
 }
 
 \examples{
-# Simulated quick example
+# Basic example
 set.seed(1)
 fmri_data <- matrix(rnorm(40), nrow = 20, ncol = 2)
 events <- matrix(0, nrow = 20, ncol = 1)
 events[c(5, 15), 1] <- 1
-fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
+fit <- estimate_parametric_hrf(fmri_data, events, parametric_model = "lwu",
                                verbose = FALSE)
 summary(fit)
+
+# Using data-driven initialization
+fit_dd <- estimate_parametric_hrf(fmri_data, events, 
+                                  theta_seed = "data_driven",
+                                  verbose = FALSE)
+
+# With refinement options
+fit_refined <- estimate_parametric_hrf(fmri_data, events,
+                                       global_refinement = TRUE,
+                                       tiered_refinement = "moderate",
+                                       verbose = FALSE)
+
+\dontrun{
+# Using baseline_model for complex confound regression
+library(fmrireg)
+sframe <- sampling_frame(blocklens = c(150, 150), TR = 2)
+bmodel <- baseline_model(basis = "bs", degree = 5, sframe = sframe)
+
+fit_baseline <- estimate_parametric_hrf(fmri_data, events,
+                                        baseline_model = bmodel,
+                                        verbose = FALSE)
+}
 
 }

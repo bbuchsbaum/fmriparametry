@@ -6,7 +6,7 @@
 #' @param fmri_data Matrix or dataset-like object
 #' @param event_model Matrix or object convertible to design matrix
 #' @param confound_formula Optional formula for confound regressors
-#' @param baseline_model Baseline model specification (unused placeholder)
+#' @param baseline_model Either an fmrireg::baseline_model object or "intercept" (default)
 #' @param hrf_eval_times Optional vector of HRF evaluation times
 #' @param hrf_span Span for HRF evaluation grid when `hrf_eval_times` is NULL
 #' @param mask Optional logical vector selecting voxels
@@ -17,7 +17,7 @@
   fmri_data,
   event_model,
   confound_formula = NULL,
-  baseline_model = "intercept",
+  baseline_model = NULL,
   hrf_eval_times = NULL,
   hrf_span = 30,
   mask = NULL
@@ -67,12 +67,18 @@
     warning("No events detected in event_model", call. = FALSE)
   }
 
-  # Step 3: confound matrix
-  if (is.null(confound_formula)) {
-    Z <- NULL
-  } else {
+  # Step 3: confound/baseline matrix
+  if (!is.null(baseline_model) && 
+      requireNamespace("fmrireg", quietly = TRUE) &&
+      inherits(baseline_model, "baseline_model")) {
+    # Use fmrireg baseline_model
+    Z <- as.matrix(fmrireg::design_matrix(baseline_model))
+  } else if (!is.null(confound_formula)) {
+    # Backward compatibility: formula-based confounds
     df_tmp <- data.frame(scan = scan_times)
     Z <- stats::model.matrix(confound_formula, data = df_tmp)
+  } else {
+    Z <- NULL
   }
 
   # Step 4: project out confounds
