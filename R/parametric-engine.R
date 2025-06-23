@@ -1,3 +1,11 @@
+# Helper to check if baseline_model is "intercept" string
+.is_intercept_baseline <- function(baseline_model) {
+  !is.null(baseline_model) && 
+  is.character(baseline_model) && 
+  length(baseline_model) == 1 && 
+  baseline_model == "intercept"
+}
+
 #' Internal parametric HRF fitting engine
 #'
 #' Core implementation of the Taylor approximation method for parametric HRF estimation.
@@ -36,7 +44,7 @@
   lambda_ridge = 0.01,
   epsilon_beta = 1e-6,
   verbose = FALSE,
-  baseline_model = "intercept"
+  baseline_model = NULL
 ) {
   # Validate inputs before computing dimensions
   .validate_input(Y_proj, "Y_proj", type = "matrix")
@@ -86,13 +94,19 @@
 
   # 2b. Add intercept/baseline column if requested
   has_intercept <- FALSE
-  if (!is.null(baseline_model) && baseline_model == "intercept") {
+  if (.is_intercept_baseline(baseline_model)) {
     intercept_col <- matrix(1.0, nrow = n_time, ncol = 1)
     X_design <- cbind(intercept_col, X_design)
     has_intercept <- TRUE
   }
 
   # 3. Linear solution with ridge regularisation
+  # Check numerical stability before solving
+  if (verbose || getOption("fmriparametric.check_stability", FALSE)) {
+    .diag_check_stability(X_design, 
+                         operation = "Taylor approximation design matrix")
+  }
+  
   # Debug: Check types before calling C++
   if (getOption("fmriparametric.debug", FALSE)) {
     cat("\nDEBUG before ridge_linear_solve:\n")
@@ -147,11 +161,7 @@
 
   # 5. Apply bounds if provided
   if (!is.null(theta_bounds)) {
-    lower <- matrix(theta_bounds$lower,
-                    nrow = n_vox, ncol = n_params, byrow = TRUE)
-    upper <- matrix(theta_bounds$upper,
-                    nrow = n_vox, ncol = n_params, byrow = TRUE)
-    theta_hat <- pmin(upper, pmax(lower, theta_hat))
+    theta_hat <- .apply_bounds(theta_hat, theta_bounds)
   }
 
   if (!is.null(hrf_interface$parameter_names)) {
@@ -172,51 +182,51 @@
   
   r_squared <- fit_metrics$r_squared
 
-  # DEBUG: Add detailed diagnostics
-  if (any(r_squared == 0) || all(r_squared < 0.01)) {
-    cat("\n=== PARAMETRIC ENGINE DEBUG (Low R² detected) ===\n")
-    cat("Number of voxels with R² = 0:", sum(r_squared == 0), "\n")
-    cat("Mean R²:", mean(r_squared), "\n")
-    cat("Max R²:", max(r_squared), "\n")
-    
-    # Check a sample voxel
-    voxel_vars <- apply(Y_proj, 2, var)
-    v_idx <- which.max(voxel_vars)[1]  # Pick highest variance voxel
-    if (!is.na(v_idx)) {
-      cat("\nDiagnosing highest variance voxel", v_idx, ":\n")
-      cat("Y data range:", range(Y_proj[, v_idx]), "\n")
-      cat("Y variance:", var(Y_proj[, v_idx]), "\n")
-      cat("Y mean:", mean(Y_proj[, v_idx]), "\n")
-      cat("X_design dim:", dim(X_design), "\n")
-      cat("Has intercept:", has_intercept, "\n")
-      if (has_intercept) {
-        cat("X_design[,1] (intercept) range:", range(X_design[, 1]), "\n")
-        cat("X_design[,2] (HRF) range:", range(X_design[, 2]), "\n")
-      } else {
-        cat("X_design[,1] (HRF) range:", range(X_design[, 1]), "\n")
-      }
-      cat("Beta values:", coeffs[, v_idx], "\n")
-      cat("Fitted values range:", range(fitted_values[, v_idx]), "\n")
-      cat("Fitted values mean:", mean(fitted_values[, v_idx]), "\n")
-      cat("Fitted values variance:", var(fitted_values[, v_idx]), "\n")
-      cat("SS_res:", fit_metrics$rss[v_idx], "\n")
-      cat("SS_tot:", fit_metrics$tss[v_idx], "\n")
-      cat("R²:", r_squared[v_idx], "\n")
-      
-      # Check if design matrix is all zeros
-      if (all(abs(X_design) < 1e-10)) {
-        cat("\nWARNING: Design matrix X_design is all zeros!\n")
-      }
-      
-      # Check convolution result
-      cat("\nConvolution check:\n")
-      cat("S_target_proj dim:", dim(S_target_proj), "\n")
-      cat("S_target_proj[,1] range:", range(S_target_proj[,1]), "\n")
-      cat("X_basis dim:", dim(X_basis), "\n")
-      cat("X_basis[,1] (HRF) range:", range(X_basis[,1]), "\n")
-    }
-    cat("=================================\n\n")
-  }
+  # DEBUG: Add detailed diagnostics (commented out for production)
+  # if (any(r_squared == 0) || all(r_squared < 0.01)) {
+  #   cat("\n=== PARAMETRIC ENGINE DEBUG (Low R^2 detected) ===\n")
+  #   cat("Number of voxels with R^2 = 0:", sum(r_squared == 0), "\n")
+  #   cat("Mean R^2:", mean(r_squared), "\n")
+  #   cat("Max R^2:", max(r_squared), "\n")
+  #   
+  #   # Check a sample voxel
+  #   voxel_vars <- apply(Y_proj, 2, var)
+  #   v_idx <- which.max(voxel_vars)[1]  # Pick highest variance voxel
+  #   if (!is.na(v_idx)) {
+  #     cat("\nDiagnosing highest variance voxel", v_idx, ":\n")
+  #     cat("Y data range:", range(Y_proj[, v_idx]), "\n")
+  #     cat("Y variance:", var(Y_proj[, v_idx]), "\n")
+  #     cat("Y mean:", mean(Y_proj[, v_idx]), "\n")
+  #     cat("X_design dim:", dim(X_design), "\n")
+  #     cat("Has intercept:", has_intercept, "\n")
+  #     if (has_intercept) {
+  #       cat("X_design[,1] (intercept) range:", range(X_design[, 1]), "\n")
+  #       cat("X_design[,2] (HRF) range:", range(X_design[, 2]), "\n")
+  #     } else {
+  #       cat("X_design[,1] (HRF) range:", range(X_design[, 1]), "\n")
+  #     }
+  #     cat("Beta values:", coeffs[, v_idx], "\n")
+  #     cat("Fitted values range:", range(fitted_values[, v_idx]), "\n")
+  #     cat("Fitted values mean:", mean(fitted_values[, v_idx]), "\n")
+  #     cat("Fitted values variance:", var(fitted_values[, v_idx]), "\n")
+  #     cat("SS_res:", fit_metrics$rss[v_idx], "\n")
+  #     cat("SS_tot:", fit_metrics$tss[v_idx], "\n")
+  #     cat("R^2:", r_squared[v_idx], "\n")
+  #     
+  #     # Check if design matrix is all zeros
+  #     if (all(abs(X_design) < 1e-10)) {
+  #       cat("\nWARNING: Design matrix X_design is all zeros!\n")
+  #     }
+  #     
+  #     # Check convolution result
+  #     cat("\nConvolution check:\n")
+  #     cat("S_target_proj dim:", dim(S_target_proj), "\n")
+  #     cat("S_target_proj[,1] range:", range(S_target_proj[,1]), "\n")
+  #     cat("X_basis dim:", dim(X_basis), "\n")
+  #     cat("X_basis[,1] (HRF) range:", range(X_basis[,1]), "\n")
+  #   }
+  #   cat("=================================\n\n")
+  # }
 
   list(
     theta_hat = theta_hat,

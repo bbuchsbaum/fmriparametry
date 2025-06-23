@@ -1,3 +1,11 @@
+# Helper to check if baseline_model is "intercept" string
+.is_intercept_baseline <- function(baseline_model) {
+  !is.null(baseline_model) && 
+  is.character(baseline_model) && 
+  length(baseline_model) == 1 && 
+  baseline_model == "intercept"
+}
+
 #' Stage 0: Validate inputs and prepare data
 #'
 #' @param fmri_data Raw fMRI data
@@ -5,7 +13,7 @@
 #' @param hrf_interface HRF interface object
 #' @param config List containing all configuration parameters
 #' @return List with validated and prepared data
-#' @keywords internal
+#' @noRd
 .stage0_validate_and_prepare <- function(fmri_data, event_model, hrf_interface, config) {
   # Extract config parameters
   confound_formula <- config$confound_formula
@@ -16,7 +24,11 @@
   safety_mode <- config$safety_mode
   verbose <- config$verbose
   
-  if (verbose) cat("→ Stage 0: Input validation and safety checks...\n")
+  if (verbose) cat("-> Stage 0: Input validation and safety checks...\n")
+  
+  # Create stage profiler if verbose
+  profiler <- if (verbose) .diag_stage_profiler() else NULL
+  if (!is.null(profiler)) profiler$start_stage("validation")
   
   # Validate inputs based on safety mode
   validation_level <- switch(safety_mode,
@@ -30,7 +42,7 @@
     .rock_solid_validate_inputs(
       fmri_data = fmri_data,
       event_model = event_model,
-      parametric_hrf = config$parametric_hrf,
+      parametric_model = config$parametric_model,
       theta_seed = config$theta_seed,
       theta_bounds = config$theta_bounds,
       hrf_span = hrf_span,
@@ -48,7 +60,7 @@
   }
   
   # Prepare data
-  if (verbose) cat("→ Preparing data matrices...\n")
+  if (verbose) cat("-> Preparing data matrices...\n")
   inputs <- .prepare_parametric_inputs(
     fmri_data = fmri_data,
     event_model = event_model,
@@ -62,11 +74,17 @@
   n_vox <- ncol(inputs$Y_proj)
   n_time <- nrow(inputs$Y_proj)
   
+  # End profiling
+  if (!is.null(profiler)) {
+    profiler$end_stage("validation", list(n_vox = n_vox, n_time = n_time))
+  }
+  
   list(
     inputs = inputs,
     n_vox = n_vox,
     n_time = n_time,
-    validation_level = validation_level
+    validation_level = validation_level,
+    profiler = profiler
   )
 }
 
@@ -76,10 +94,10 @@
 #' @param hrf_interface HRF interface object
 #' @param config Configuration list
 #' @return List with initialized parameters
-#' @keywords internal
+#' @noRd
 .stage1_initialize_parameters <- function(prepared_data, hrf_interface, config) {
   verbose <- config$verbose
-  if (verbose) cat("\n→ Stage 1: Parameter initialization...\n")
+  if (verbose) cat("\n-> Stage 1: Parameter initialization...\n")
   
   n_vox <- prepared_data$n_vox
   n_params <- length(hrf_interface$parameter_names)
@@ -187,19 +205,14 @@
 #' @param hrf_interface HRF interface object
 #' @param config Configuration list
 #' @return List with core estimation results
-#' @keywords internal
+#' @noRd
 .stage2_core_estimation <- function(prepared_data, init_params, hrf_interface, config) {
   verbose <- config$verbose
-  if (verbose) cat("\n→ Stage 2: Core parametric estimation...\n")
+  if (verbose) cat("\n-> Stage 2: Core parametric estimation...\n")
   
-  # Setup parallel backend if requested
+  # Parallel processing not yet implemented
   parallel_config <- NULL
-  if (config$parallel) {
-    parallel_config <- .setup_parallel_backend(n_cores = config$n_cores, verbose = verbose)
-    process_function <- .parametric_engine_parallel
-  } else {
-    process_function <- .parametric_engine
-  }
+  process_function <- .parametric_engine
   
   # Run core engine
   args <- list(
@@ -213,9 +226,7 @@
     baseline_model = config$baseline_model
   )
   
-  if (config$parallel) {
-    args$parallel_config <- parallel_config
-  }
+  # Parallel config would be added here when implemented
   
   core_result <- do.call(process_function, args)
   
@@ -234,7 +245,7 @@
   r_squared <- core_result$r_squared
   
   if (verbose) {
-    cat(sprintf("  Initial fit: Mean R² = %.3f (range: %.3f - %.3f)\n",
+    cat(sprintf("  Initial fit: Mean R^2 = %.3f (range: %.3f - %.3f)\n",
                 mean(r_squared), min(r_squared), max(r_squared)))
   }
   
@@ -244,8 +255,7 @@
     r_squared = r_squared,
     residuals = core_result$residuals,  # Pass through residuals
     intercepts = if (!is.null(core_result$coeffs) && 
-                     !is.null(config$baseline_model) && 
-                     config$baseline_model == "intercept") {
+                     .is_intercept_baseline(config$baseline_model)) {
                    core_result$coeffs[1, ]  # First row contains intercepts
                  } else NULL,
     core_result = core_result,
@@ -260,7 +270,7 @@
 #' @param hrf_interface HRF interface object
 #' @param config Configuration list
 #' @return List with refined parameters
-#' @keywords internal
+#' @noRd
 .stage3_global_refinement <- function(prepared_data, core_results, hrf_interface, config) {
   # Check if refinement is enabled
   use_global_refinement <- isTRUE(getOption("fmriparametric.refine_global", TRUE))
@@ -276,7 +286,7 @@
   }
   
   verbose <- config$verbose
-  if (verbose) cat("\n→ Stage 3: Global iterative refinement...\n")
+  if (verbose) cat("\n-> Stage 3: Global iterative refinement...\n")
   
   # Initialize tracking variables
   theta_current <- core_results$theta_current
@@ -292,8 +302,8 @@
     converged = FALSE
   )
   
-  # Choose processing function
-  process_function <- if (config$parallel) .parametric_engine_parallel else .parametric_engine
+  # Use non-parallel processing for now
+  process_function <- .parametric_engine
   
   # Refinement loop
   for (iter in seq_len(config$global_passes)) {
@@ -333,9 +343,7 @@
       baseline_model = config$baseline_model
     )
     
-    if (config$parallel) {
-      args$parallel_config <- core_results$parallel_config
-    }
+    # Parallel config would be added here when implemented
     
     iter_result <- do.call(process_function, args)
     
@@ -365,11 +373,21 @@
     amplitudes <- iter_result$beta0
     r_squared_new <- iter_result$r_squared
     
-    # Check convergence
-    max_change <- max(abs(theta_current - theta_prev))
+    # Check convergence using unified criteria
+    convergence_config <- .create_convergence_config(
+      param_tol = config$convergence_epsilon,
+      r2_tol = 1e-5
+    )
+    
+    conv_check <- .check_convergence(
+      current = theta_current,
+      previous = theta_prev,
+      config = convergence_config
+    )
+    
     mean_r2_change <- mean(r_squared_new) - mean(r_squared_prev)
     
-    if (mean_r2_change < 0) {
+    if (mean_r2_change < -convergence_config$r2_tol) {
       if (verbose) cat("No improvement, rolling back\n")
       theta_current <- theta_prev
       amplitudes <- core_results$amplitudes
@@ -384,13 +402,15 @@
       }
       
       if (verbose) {
-        cat(sprintf("Max Δθ = %.4f, Mean R² = %.3f (Δ = %+.4f)\n",
+        max_change <- max(abs(theta_current - theta_prev))
+        cat(sprintf("Max Deltatheta = %.4f, Mean R^2 = %.3f (Delta = %+.4f)\n",
                     max_change, mean(r_squared), mean_r2_change))
       }
       
-      if (max_change < config$convergence_epsilon) {
-        if (verbose) cat("  ✓ Converged!\n")
+      if (conv_check$converged) {
+        if (verbose) cat("  [OK] Converged!\n")
         convergence_info$converged <- TRUE
+        convergence_info$convergence_reason <- conv_check$reason
         break
       }
     }
@@ -416,7 +436,7 @@
 #' @param hrf_interface HRF interface object
 #' @param config Configuration list
 #' @return List with tiered refinement results
-#' @keywords internal
+#' @noRd
 .stage4_tiered_refinement <- function(prepared_data, refined_results, hrf_interface, config) {
   if (config$tiered_refinement == "none") {
     return(list(
@@ -433,25 +453,25 @@
   }
   
   verbose <- config$verbose
-  if (verbose) cat("\n→ Stage 4: Tiered voxel refinement...\n")
+  if (verbose) cat("\n-> Stage 4: Tiered voxel refinement...\n")
   
   theta_current <- refined_results$theta_current
   amplitudes <- refined_results$amplitudes
   r_squared <- refined_results$r_squared
   n_vox <- prepared_data$n_vox
   
-  # Classify voxels using R²-only mode (Stage 5 will compute real SEs)
+  # Classify voxels using R^2-only mode (Stage 5 will compute real SEs)
   voxel_classes <- .classify_voxels_for_refinement(
     r_squared = r_squared,
-    se_theta = NULL,  # NULL triggers R²-only classification
+    se_theta = NULL,  # NULL triggers R^2-only classification
     thresholds = config$refinement_thresholds
   )
   
   if (verbose) {
     cat(sprintf("  Voxel classification:\n"))
-    cat(sprintf("    Easy (high R²): %d voxels\n", sum(voxel_classes == "easy")))
+    cat(sprintf("    Easy (high R^2): %d voxels\n", sum(voxel_classes == "easy")))
     cat(sprintf("    Moderate: %d voxels\n", sum(voxel_classes == "moderate")))
-    cat(sprintf("    Hard (low R²): %d voxels\n", sum(voxel_classes == "hard")))
+    cat(sprintf("    Hard (low R^2): %d voxels\n", sum(voxel_classes == "hard")))
   }
   
   refinement_info <- list(
@@ -499,17 +519,9 @@
     # Get the projected stimulus matrix
     S_target_proj <- prepared_data$inputs$S_target_proj
     
-    # For Gauss-Newton, we need the original stimulus, not the projected version
-    # The projection removes the intercept which GN needs to handle internally
-    if (!is.null(prepared_data$inputs$S_target)) {
-      S_target_use <- prepared_data$inputs$S_target
-    } else {
-      S_target_use <- S_target_proj
-    }
-    
     # Ensure it's a matrix
-    if (is.null(dim(S_target_use))) {
-      S_target_use <- matrix(S_target_use, ncol = 1)
+    if (is.null(dim(S_target_proj))) {
+      S_target_proj <- matrix(S_target_proj, ncol = 1)
     }
     
     # Ensure theta_current is a proper matrix
@@ -521,7 +533,7 @@
       theta_hat_voxel = theta_current,
       r2_voxel = r_squared,
       Y_proj = prepared_data$inputs$Y_proj,
-      S_target_proj = S_target_use,
+      S_target_proj = S_target_proj,
       scan_times = seq_len(nrow(prepared_data$inputs$Y_proj)),
       hrf_eval_times = prepared_data$inputs$hrf_eval_times,
       hrf_interface = hrf_interface,
@@ -587,7 +599,7 @@
     Y_fitted <- sweep(Y_conv, 2, amplitudes, "*")
     
     # Add intercept if present
-    if (!is.null(config$baseline_model) && config$baseline_model == "intercept") {
+    if (.is_intercept_baseline(config$baseline_model)) {
       # Intercepts should be available from the parametric engine results
       if (!is.null(refined_results$intercepts)) {
         Y_fitted <- sweep(Y_fitted, 2, refined_results$intercepts, "+")
@@ -598,11 +610,11 @@
     r_squared <- .compute_r_squared(
       prepared_data$inputs$Y_proj, 
       Y_fitted, 
-      has_intercept = (!is.null(config$baseline_model) && config$baseline_model == "intercept")
+      has_intercept = .is_intercept_baseline(config$baseline_model)
     )
     
     if (verbose) {
-      cat(sprintf("  Final fit after refinement: Mean R² = %.3f\n", mean(r_squared)))
+      cat(sprintf("  Final fit after refinement: Mean R^2 = %.3f\n", mean(r_squared)))
     }
   }
   
@@ -659,14 +671,14 @@
 #' @param hrf_interface HRF interface object
 #' @param config Configuration list
 #' @return List with standard errors
-#' @keywords internal
+#' @noRd
 .stage5_statistical_inference <- function(tiered_results, prepared_data, hrf_interface, config) {
   if (!config$compute_se || !is.null(tiered_results$se_theta)) {
     return(tiered_results)
   }
   
   verbose <- config$verbose
-  if (verbose) cat("\n→ Stage 5: Computing standard errors...\n")
+  if (verbose) cat("\n-> Stage 5: Computing standard errors...\n")
   
   se_result <- .compute_standard_errors_delta(
     theta_hat = tiered_results$theta_current,
@@ -691,7 +703,7 @@
 #' @param config Configuration list
 #' @param total_time Total computation time
 #' @return parametric_hrf_fit object
-#' @keywords internal
+#' @noRd
 .package_final_results <- function(final_results, prepared_data, hrf_interface, config, total_time) {
   n_vox <- prepared_data$n_vox
   n_time <- prepared_data$n_time
@@ -740,7 +752,7 @@
     fitted_values <- sweep(Y_conv, 2, final_results$amplitudes, "*")
     
     # Add intercept if present
-    if (!is.null(config$baseline_model) && config$baseline_model == "intercept" &&
+    if (.is_intercept_baseline(config$baseline_model) &&
         !is.null(final_results$intercepts)) {
       fitted_values <- sweep(fitted_values, 2, final_results$intercepts, "+")
     }
@@ -770,7 +782,7 @@
     call = config$call,
     n_voxels = n_vox,
     n_timepoints = prepared_data$n_time,
-    hrf_model = config$parametric_hrf,
+    parametric_model = config$parametric_model,
     theta_seed = config$theta_seed,
     theta_bounds = final_results$theta_bounds,
     settings = list(
@@ -796,6 +808,30 @@
     convergence_info <- list()
   }
   
+  # Compute HRF shapes for each voxel
+  hrf_shape <- NULL
+  if (!is.null(hrf_interface) && !is.null(hrf_interface$hrf_function)) {
+    # Standard time grid for HRF evaluation (0 to 24 seconds, 0.1s resolution)
+    time_grid <- seq(0, 24, by = 0.1)
+    n_voxels <- nrow(final_results$theta_current)
+    hrf_curves <- matrix(NA_real_, nrow = length(time_grid), ncol = n_voxels)
+    
+    # Compute HRF curve for each voxel
+    for (i in seq_len(n_voxels)) {
+      tryCatch({
+        hrf_curves[, i] <- hrf_interface$hrf_function(time_grid, final_results$theta_current[i, ])
+      }, error = function(e) {
+        # If HRF computation fails for a voxel, leave as NA
+        warning("Failed to compute HRF for voxel ", i, ": ", e$message, call. = FALSE)
+      })
+    }
+    
+    hrf_shape <- list(
+      time_grid = time_grid,
+      curves = hrf_curves
+    )
+  }
+
   # Create and return parametric_hrf_fit object
   fit <- new_parametric_hrf_fit(
     estimated_parameters = final_results$theta_current,
@@ -807,12 +843,13 @@
     } else {
       paste0("param", seq_len(ncol(final_results$theta_current)))
     },
-    hrf_model = config$parametric_hrf,
+    parametric_model = config$parametric_model,
     r_squared = final_results$r_squared,
     residuals = residuals,
     parameter_ses = final_results$se_theta,
     convergence_info = convergence_info,
-    metadata = metadata
+    metadata = metadata,
+    hrf_shape = hrf_shape
   )
   
   fit$standard_errors <- final_results$se_theta
@@ -831,7 +868,7 @@
 #' using local Taylor expansion. This is more efficient than individual
 #' voxel refinement.
 #'
-#' @keywords internal
+#' @noRd
 .refine_moderate_voxels_grouped <- function(
   voxel_idx, Y_proj, S_target_proj, theta_current, r_squared,
   hrf_interface, hrf_eval_times, theta_bounds = NULL,
@@ -945,7 +982,7 @@
 #'
 #' Computes optimal amplitudes given HRF parameters
 #'
-#' @keywords internal
+#' @noRd
 .compute_amplitudes_for_voxels <- function(
   voxel_idx, theta_hat, Y_proj, S_target_proj,
   hrf_interface, hrf_eval_times

@@ -26,11 +26,13 @@
 #'
 #' @param fmri_data An fMRI dataset object or numeric matrix (timepoints x voxels)
 #' @param event_model Event timing design matrix or event model object
-#' @param parametric_hrf Character string specifying HRF model (currently "lwu")
+#' @param parametric_model Character string specifying HRF model (currently "lwu")
 #' @param theta_seed Initial parameters or "data_driven" for automatic selection
 #' @param theta_bounds List with 'lower' and 'upper' bounds for parameters
-#' @param confound_formula Optional formula for nuisance regressors
-#' @param baseline_model Baseline model specification (default "intercept")
+#' @param confound_formula Optional formula for nuisance regressors (deprecated, use baseline_model)
+#' @param baseline_model Either an fmrireg::baseline_model object for complex confound regression,
+#'   or NULL (default) for no confound regression. When provided as baseline_model object,
+#'   supports drift modeling, motion parameters, and other nuisance regressors.
 #' @param hrf_eval_times Time points for HRF evaluation
 #' @param hrf_span Duration for HRF evaluation (default 30 seconds)
 #' @param lambda_ridge Ridge penalty for stability (default 0.01)
@@ -42,7 +44,7 @@
 #' @param kmeans_k Number of clusters for K-means (default 5)
 #' @param kmeans_passes Number of K-means refinement passes (default 2)
 #' @param tiered_refinement Character: refinement strategy ("none", "moderate", "aggressive")
-#' @param refinement_thresholds List of R² and SE thresholds for tiered refinement
+#' @param refinement_thresholds List of R^2 and SE thresholds for tiered refinement
 #' @param parallel Logical: use parallel processing?
 #' @param n_cores Number of cores for parallel processing (NULL = auto-detect)
 #' @param compute_se Logical: compute standard errors?
@@ -52,9 +54,6 @@
 #'   "performance" uses minimal validation.
 #' @param progress Logical: show progress bar?
 #' @param verbose Logical: print detailed messages?
-#' @param .implementation Deprecated. Character string specifying which implementation to use.
-#'   The refactored implementation is now the default. Use "legacy" to temporarily
-#'   access the old implementation. The "compare" option has been removed.
 #'
 #' @return Object of class 'parametric_hrf_fit' containing:
 #'   - estimated_parameters: Matrix of HRF parameters (voxels x parameters)
@@ -71,7 +70,7 @@
 #' fmri_data <- matrix(rnorm(40), nrow = 20, ncol = 2)
 #' events <- matrix(0, nrow = 20, ncol = 1)
 #' events[c(5, 15), 1] <- 1
-#' fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
+#' fit <- estimate_parametric_hrf(fmri_data, events, parametric_model = "lwu",
 #'                                verbose = FALSE)
 #' summary(fit)
 #' 
@@ -85,17 +84,28 @@
 #'                                        global_refinement = TRUE,
 #'                                        tiered_refinement = "moderate",
 #'                                        verbose = FALSE)
+#' 
+#' \dontrun{
+#' # Using baseline_model for complex confound regression
+#' library(fmrireg)
+#' sframe <- sampling_frame(blocklens = c(150, 150), TR = 2)
+#' bmodel <- baseline_model(basis = "bs", degree = 5, sframe = sframe)
+#' 
+#' fit_baseline <- estimate_parametric_hrf(fmri_data, events,
+#'                                         baseline_model = bmodel,
+#'                                         verbose = FALSE)
+#' }
 #'
 #' @export
 estimate_parametric_hrf <- function(
   fmri_data,
   event_model,
-  parametric_hrf = "lwu",
+  parametric_model = "lwu",
   # Basic parameters
   theta_seed = NULL,
   theta_bounds = NULL,
   confound_formula = NULL,
-  baseline_model = "intercept",
+  baseline_model = NULL,
   hrf_eval_times = NULL,
   hrf_span = 30,
   lambda_ridge = 0.01,
@@ -125,10 +135,9 @@ estimate_parametric_hrf <- function(
   # Safety and diagnostics
   safety_mode = c("balanced", "maximum", "performance"),
   progress = TRUE,
-  verbose = TRUE,
-  # Implementation selection
-  .implementation = NULL
+  verbose = TRUE
 ) {
+  
   
   # Ensure matrices are double-precision for C++ backend
   if (is.matrix(fmri_data) && typeof(fmri_data) != "double") {
@@ -142,7 +151,7 @@ estimate_parametric_hrf <- function(
   args <- list(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = parametric_hrf,
+    parametric_model = parametric_model,
     theta_seed = theta_seed,
     theta_bounds = theta_bounds,
     confound_formula = confound_formula,
@@ -167,50 +176,6 @@ estimate_parametric_hrf <- function(
     verbose = verbose
   )
   
-  # Handle deprecated .implementation parameter
-  if (!is.null(.implementation)) {
-    if (.implementation == "legacy") {
-      warning(
-        "The '.implementation' parameter is deprecated. ",
-        "The refactored implementation is now the default.\n",
-        "To temporarily use the legacy implementation, set:\n",
-        "  options(fmriparametric.use_legacy = TRUE)\n",
-        "Legacy support will be removed in a future version.",
-        call. = FALSE
-      )
-      # Load and run legacy implementation
-      .load_legacy_implementation()
-      return(do.call(.estimate_hrf_legacy, args))
-    }
-    
-    if (.implementation == "compare") {
-      stop(
-        "The 'compare' implementation option has been removed.\n",
-        "Use the test suite for implementation comparison.",
-        call. = FALSE
-      )
-    }
-    
-    if (.implementation == "refactored") {
-      # Silently proceed with refactored (now default)
-    } else {
-      stop(
-        "Unknown implementation: ", .implementation, "\n",
-        "Valid options are 'legacy' or NULL (for default).",
-        call. = FALSE
-      )
-    }
-  }
-  
-  # Check for global option to use legacy (temporary escape hatch)
-  if (isTRUE(getOption("fmriparametric.use_legacy"))) {
-    if (verbose) {
-      message("Using legacy implementation (from global option)")
-    }
-    # Load and run legacy implementation
-    .load_legacy_implementation()
-    return(do.call(.estimate_hrf_legacy, args))
-  }
   
   # DEFAULT: Use refactored implementation
   do.call(.run_hrf_estimation_engine, args)
