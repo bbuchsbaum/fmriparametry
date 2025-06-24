@@ -497,7 +497,8 @@
       hrf_interface = hrf_interface,
       hrf_eval_times = prepared_data$inputs$hrf_eval_times,
       theta_bounds = if (!is.null(hrf_interface$active_bounds)) hrf_interface$active_bounds else config$theta_bounds,
-      lambda_ridge = config$lambda_ridge
+      lambda_ridge = config$lambda_ridge,
+      baseline_model = config$baseline_model
     )
     
     # Update results
@@ -777,6 +778,15 @@
     mean_rmse = if (!is.null(rmse)) mean(rmse) else NA
   )
   
+  # Get bounds from hrf_interface or config
+  theta_bounds <- if (!is.null(hrf_interface$active_bounds)) {
+    hrf_interface$active_bounds
+  } else if (!is.null(config$theta_bounds)) {
+    config$theta_bounds
+  } else {
+    hrf_interface$default_bounds()
+  }
+  
   # Create metadata
   metadata <- list(
     call = config$call,
@@ -784,7 +794,7 @@
     n_timepoints = prepared_data$n_time,
     parametric_model = config$parametric_model,
     theta_seed = config$theta_seed,
-    theta_bounds = final_results$theta_bounds,
+    theta_bounds = theta_bounds,
     settings = list(
       global_refinement = config$global_refinement,
       global_passes = config$global_passes,
@@ -872,7 +882,7 @@
 .refine_moderate_voxels_grouped <- function(
   voxel_idx, Y_proj, S_target_proj, theta_current, r_squared,
   hrf_interface, hrf_eval_times, theta_bounds = NULL,
-  lambda_ridge = 0.01
+  lambda_ridge = 0.01, baseline_model = NULL
 ) {
   
   if (length(voxel_idx) == 0) {
@@ -922,6 +932,12 @@
       conv_full[seq_len(n_time)]
     })
     
+    # Add intercept if requested
+    has_intercept <- .is_intercept_baseline(baseline_model)
+    if (has_intercept) {
+      X <- cbind(1, X)  # Prepend intercept column
+    }
+    
     # QR decomposition for stability
     qr_decomp <- qr(X)
     Q <- qr.Q(qr_decomp)
@@ -933,8 +949,14 @@
     # Solve with ridge regularization
     coeffs <- solve(R + lambda_ridge * diag(ncol(R)), t(Q) %*% Y_block)
     
-    # Extract amplitudes
-    beta0_new <- as.numeric(coeffs[1, ])
+    # Extract amplitudes (accounting for intercept)
+    if (has_intercept) {
+      beta0_new <- as.numeric(coeffs[2, ])  # HRF amplitude is in row 2
+      coeff_start_idx <- 3  # Derivative coefficients start at row 3
+    } else {
+      beta0_new <- as.numeric(coeffs[1, ])  # HRF amplitude is in row 1
+      coeff_start_idx <- 2  # Derivative coefficients start at row 2
+    }
     
     # Compute parameter updates
     delta <- matrix(0, length(beta0_new), n_params)
@@ -942,7 +964,7 @@
     
     if (any(valid)) {
       # Normalize by amplitude to get parameter deltas
-      delta[valid, ] <- t(coeffs[2:(n_params + 1), valid, drop = FALSE]) / beta0_new[valid]
+      delta[valid, ] <- t(coeffs[coeff_start_idx:(coeff_start_idx + n_params - 1), valid, drop = FALSE]) / beta0_new[valid]
     }
     
     # Update parameters
@@ -958,7 +980,7 @@
     
     # Compute new R-squared
     fitted <- X %*% coeffs
-    r2_new <- .compute_r_squared(Y_block, fitted, has_intercept = FALSE)
+    r2_new <- .compute_r_squared(Y_block, fitted, has_intercept = has_intercept)
     
     # Only keep improvements
     keep <- !is.na(r2_new) & r2_new > r_squared[voxel_idx[g]] & valid
