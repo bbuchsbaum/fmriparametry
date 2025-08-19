@@ -20,7 +20,7 @@
 #' @param verbose Logical whether to print progress
 #'
 #' @return List with updated estimates and refinement statistics
-#' @keywords internal
+#' @noRd
 .local_recentering_moderate <- function(
   theta_hat_voxel,
   r2_voxel,
@@ -86,13 +86,8 @@
       X_taylor_v <- matrix(X_taylor_v, ncol = n_params + 1)
     }
     
-    # Design matrix via convolution
-    X_design_v <- matrix(0, nrow = n_time, ncol = ncol(X_taylor_v))
-    for (j in seq_len(ncol(X_taylor_v))) {
-      basis_col <- X_taylor_v[, j]
-      conv_full <- stats::convolve(S_target_proj[, 1], rev(basis_col), type = "open")
-      X_design_v[, j] <- conv_full[seq_len(n_time)]
-    }
+    # Design matrix via convolution using centralized helper
+    X_design_v <- .convolve_signal_with_kernels(S_target_proj[, 1], X_taylor_v, n_time)
     
     # Solve for this voxel
     tryCatch({
@@ -119,7 +114,7 @@
       # Apply bounds
       theta_v_new <- pmax(theta_bounds$lower, pmin(theta_v_new, theta_bounds$upper))
       
-      # Calculate new R²
+      # Calculate new R^2
       fitted_v_new <- X_design_v %*% coeffs_v_new
       resid_v_new <- y_v - fitted_v_new
       ss_res_new <- sum(resid_v_new^2)
@@ -153,7 +148,7 @@
     cat("    Improved:", n_improved, "voxels (", 
         round(100 * n_improved / n_moderate, 1), "%)\n")
     if (n_improved > 0) {
-      cat("    Mean R² improvement:", 
+      cat("    Mean R^2 improvement:", 
           round(mean(improvement_details[improvement_details > 0]), 4), "\n")
     }
   }

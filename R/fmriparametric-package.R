@@ -18,8 +18,8 @@
 #' @section HRF Models:
 #' Currently supported parametric HRF models:
 #' \itemize{
-#'   \item \strong{LWU (Lag-Width-Undershoot)}: 3-parameter model with lag (τ), 
-#'         width (σ), and undershoot (ρ) parameters
+#'   \item \strong{LWU (Lag-Width-Undershoot)}: 3-parameter model with lag (tau), 
+#'         width (sigma), and undershoot (rho) parameters
 #' }
 #'
 #' @section Package Design:
@@ -31,6 +31,22 @@
 #'   \item Robust numerical methods with ridge regularization
 #' }
 #'
+#' @section Experimental Features:
+#' Some features are marked as experimental and subject to change:
+#' \itemize{
+#'   \item Bayesian estimation engine (bayesian_engine.R)
+#'   \item Advanced refinement algorithms (tiered refinement)
+#'   \item Parallel processing capabilities
+#' }
+#'
+#' @section Performance and Safety Modes:
+#' The package supports three safety modes:
+#' \itemize{
+#'   \item \strong{maximum}: Full validation and diagnostic output
+#'   \item \strong{balanced}: Standard validation with moderate checks (default)
+#'   \item \strong{performance}: Minimal validation for speed
+#' }
+#'
 #' @name fmriparametric-package
 #' @aliases fmriparametric
 #'
@@ -38,6 +54,7 @@
 #' @import stats
 #' @importFrom Matrix Matrix
 #' @importFrom assertthat assert_that is.number is.flag
+#' @importFrom fmrihrf hrf_lwu hrf_basis_lwu
 #' @importFrom stats median quantile convolve cor fft kmeans mad mvfft nextn plogis prcomp reshape runif sd time var
 #' @importFrom grDevices rainbow rgb
 #' @importFrom graphics abline hist legend lines mtext par

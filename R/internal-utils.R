@@ -8,6 +8,30 @@
   if (is.null(x)) y else x
 }
 
+#' Centralized convolution helper for consistent behavior
+#'
+#' This function ensures all convolution operations use the same convention
+#' and optimized implementation throughout the package.
+#'
+#' @param signal Numeric vector or single-column matrix of the signal to convolve
+#' @param kernels Matrix of kernel functions (columns are different kernels)
+#' @param output_length Desired output length
+#' @return Matrix with convolved signals (one column per kernel)
+#' @keywords internal
+.convolve_signal_with_kernels <- function(signal, kernels, output_length) {
+  # Ensure signal is a matrix column
+  if (is.null(dim(signal))) {
+    signal <- matrix(signal, ncol = 1)
+  } else if (is.matrix(signal) && ncol(signal) > 1) {
+    # If multiple columns, sum them first (matching existing behavior)
+    signal <- matrix(rowSums(signal), ncol = 1)
+  }
+  
+  # Use the optimized batch convolution
+  # This maintains consistency with the core engine's convolution approach
+  .fast_batch_convolution(signal, kernels, output_length)
+}
+
 .fmriparametric_internal <- new.env(parent = emptyenv())
 
 .fmriparametric_internal$try_with_context <- function(expr, context = "", fallback = NULL) {

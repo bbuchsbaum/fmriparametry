@@ -19,9 +19,10 @@
 #' @param lambda_ridge Ridge penalty
 #' @param step_size Initial step size for line search
 #' @param verbose Logical whether to print progress
+#' @param convergence_config Convergence configuration list
 #'
 #' @return List with updated estimates and convergence information
-#' @keywords internal
+#' @noRd
 .gauss_newton_refinement <- function(
   theta_hat_voxel,
   r2_voxel,
@@ -36,11 +37,21 @@
   tol_gn = 1e-4,
   lambda_ridge = 0.01,
   step_size = 1.0,
-  verbose = FALSE
+  verbose = FALSE,
+  convergence_config = NULL
 ) {
   n_vox <- nrow(theta_hat_voxel)
   n_params <- ncol(theta_hat_voxel)
   n_time <- nrow(Y_proj)
+  
+  # Use unified convergence config if provided, otherwise use defaults
+  if (is.null(convergence_config)) {
+    convergence_config <- .create_convergence_config(
+      param_tol = tol_gn,
+      objective_tol = tol_gn,
+      max_iter = max_iter_gn
+    )
+  }
   
   # Identify hard voxels
   idx_hard <- which(queue_labels == "hard_GN")
@@ -78,6 +89,13 @@
   for (i in seq_along(idx_hard)) {
     v <- idx_hard[i]
     y_v <- Y_proj[, v]
+    
+    # Skip if already has good R^2
+    if (r2_voxel[v] > 0.9) {
+      convergence_status[i] <- "already_good"
+      iteration_counts[i] <- 0
+      next
+    }
     
     # Initialize with current estimate
     if (v > nrow(theta_hat_voxel)) {
@@ -132,7 +150,7 @@
     singular <- FALSE
     
     # Gauss-Newton iterations
-    for (iter in seq_len(max_iter_gn)) {
+    for (iter in seq_len(convergence_config$max_iter)) {
       # Get Jacobian and residuals at current point
       jacob_info <- .get_jacobian_and_residuals(
         theta_current, y_v, S_target_proj, hrf_eval_times,
@@ -211,8 +229,7 @@
         }
         
         # Apply bounds
-        theta_proposal_bounded <- pmax(theta_bounds$lower, 
-                                       pmin(theta_proposal, theta_bounds$upper))
+        theta_proposal_bounded <- .apply_bounds(theta_proposal, theta_bounds)
         
         # Check if bounds application caused issues
         if (length(theta_proposal_bounded) != length(theta_proposal)) {
@@ -275,13 +292,18 @@
         }
       }
 
-      # Check convergence
-      param_change <- sqrt(sum((theta_new - theta_current)^2))
-      obj_change <- abs(obj_new - obj_current) / (abs(obj_current) + 1e-10)
+      # Check convergence using unified criteria
+      conv_check <- .check_convergence(
+        current = theta_new,
+        previous = theta_current,
+        obj_current = obj_new,
+        obj_previous = obj_current,
+        config = convergence_config
+      )
       
-      if (param_change < tol_gn || obj_change < tol_gn) {
+      if (conv_check$converged) {
         converged <- TRUE
-        convergence_status[i] <- "converged"
+        convergence_status[i] <- conv_check$reason
         n_converged <- n_converged + 1
         break
       }
@@ -365,7 +387,14 @@
 #' indicates that the system is singular and the amplitude cannot be
 #' estimated reliably.
 #'
-#' @keywords internal
+#' @param theta Numeric vector of HRF parameters
+#' @param y Numeric vector of observed BOLD data
+#' @param S Numeric matrix of stimulus design
+#' @param t_hrf Numeric vector of HRF evaluation time points
+#' @param hrf_interface List with HRF interface functions
+#' @param n_time Integer number of time points
+#' @return Numeric scalar sum of squared residuals
+#' @noRd
 .calculate_objective_gn <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
   # Validate theta
   if (!is.numeric(theta) || length(theta) != length(hrf_interface$parameter_names)) {
@@ -378,9 +407,8 @@
   # Generate HRF at current parameters
   hrf_vals <- hrf_interface$hrf_function(t_hrf, theta)
 
-  # Convolve with stimulus
-  conv_full <- stats::convolve(S[, 1], rev(hrf_vals), type = "open")
-  x_pred_raw <- conv_full[seq_len(n_time)]
+  # Convolve with stimulus using centralized helper
+  x_pred_raw <- .convolve_signal_with_kernels(S[, 1], matrix(hrf_vals, ncol = 1), n_time)[, 1]
 
   denom <- sum(x_pred_raw^2)
   if (denom < 1e-8) {
@@ -400,7 +428,14 @@
 #' Returns `NULL` if the HRF predictor has near-zero magnitude, which
 #' indicates a singular system.
 #'
-#' @keywords internal
+#' @param theta Numeric vector of HRF parameters
+#' @param y Numeric vector of observed BOLD data
+#' @param S Numeric matrix of stimulus design
+#' @param t_hrf Numeric vector of HRF evaluation time points
+#' @param hrf_interface List with HRF interface functions
+#' @param n_time Integer number of time points
+#' @return List with jacobian matrix, residuals, and amplitude, or NULL if singular
+#' @noRd
 .get_jacobian_and_residuals <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
   n_params <- length(theta)
   
@@ -410,12 +445,8 @@
     taylor_basis <- matrix(taylor_basis, ncol = n_params + 1)
   }
   
-  # Convolve each basis function
-  X_conv <- matrix(0, nrow = n_time, ncol = ncol(taylor_basis))
-  for (j in seq_len(ncol(taylor_basis))) {
-    conv_full <- stats::convolve(S[, 1], rev(taylor_basis[, j]), type = "open")
-    X_conv[, j] <- conv_full[seq_len(n_time)]
-  }
+  # Convolve each basis function using centralized helper
+  X_conv <- .convolve_signal_with_kernels(S[, 1], taylor_basis, n_time)
   
   # Fit amplitude for current HRF
   x_hrf <- X_conv[, 1]

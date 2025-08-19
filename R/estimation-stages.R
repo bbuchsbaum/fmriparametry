@@ -417,6 +417,7 @@
   }
   
   convergence_info$global_iterations <- iter
+  convergence_info$iterations <- iter  # Add for backward compatibility with print methods
   
   list(
     theta_current = best_theta,
@@ -926,11 +927,8 @@
       basis <- matrix(basis, ncol = n_params + 1)
     }
     
-    # Create design matrix via convolution
-    X <- sapply(seq_len(ncol(basis)), function(j) {
-      conv_full <- stats::convolve(S_target_proj[, 1], rev(basis[, j]), type = "open")
-      conv_full[seq_len(n_time)]
-    })
+    # Create design matrix via convolution using centralized helper
+    X <- .convolve_signal_with_kernels(S_target_proj[, 1], basis, n_time)
     
     # Add intercept if requested
     has_intercept <- .is_intercept_baseline(baseline_model)
@@ -1013,8 +1011,7 @@
   
   amp_fun <- function(v) {
     hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_hat[v, ])
-    conv_full <- stats::convolve(S_target_proj[, 1], rev(hrf_vals), type = "open")
-    x_pred <- conv_full[seq_len(n_time)]
+    x_pred <- .convolve_signal_with_kernels(S_target_proj[, 1], matrix(hrf_vals, ncol = 1), n_time)[, 1]
     as.numeric(crossprod(x_pred, Y_proj[, v])) / sum(x_pred^2)
   }
   

@@ -1,10 +1,3 @@
-# Helper to check if baseline_model is "intercept" string
-.is_intercept_baseline <- function(baseline_model) {
-  !is.null(baseline_model) && 
-  is.character(baseline_model) && 
-  length(baseline_model) == 1 && 
-  baseline_model == "intercept"
-}
 
 #' Internal parametric HRF fitting engine
 #'
@@ -230,7 +223,7 @@
 
   list(
     theta_hat = theta_hat,
-    beta0 = if(is.matrix(beta0)) beta0 else matrix(beta0, ncol = 1),
+    beta0 = as.numeric(beta0),  # Always return as numeric vector
     r_squared = as.numeric(r_squared),
     residuals = residuals,
     coeffs = coeffs
