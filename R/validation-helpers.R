@@ -1,322 +1,242 @@
-#' Validation Helper Functions
+#' Validation helpers for fmriparametric
 #'
-#' Input validation functions extracted from rock-solid-validation.R
-#' These are the actively used validation functions in the codebase.
+#' This module provides legacy validation wrappers that delegate to the
+#' unified validation core. These functions maintain backward compatibility
+#' while using the consolidated validation logic.
 
-#' Validate fMRI data input
+#' Validate fMRI data
+#' 
+#' @param fmri_data fMRI data (matrix or fmri_dataset object)
+#' @param caller Name of calling function
+#' @return List with validated data properties
 #' @keywords internal
-.validate_fmri_data <- function(fmri_data, caller = "estimate_parametric_hrf") {
-  # Type validation
+.validate_fmri_data <- function(fmri_data, caller = "function") {
   if (is.null(fmri_data)) {
-    stop(caller, ": fmri_data cannot be NULL. ",
-         "Provide a matrix, fmri_dataset, or matrix_dataset object.", 
-         call. = FALSE)
+    stop(sprintf("In %s: fmri_data cannot be NULL", caller), call. = FALSE)
   }
   
-  # Handle different input types
-  if (inherits(fmri_data, c("fmri_dataset", "matrix_dataset"))) {
-    # Extract data matrix
-    if (requireNamespace("fmrireg", quietly = TRUE)) {
-      # Use fmrireg's method to extract data
-      data_matrix <- fmrireg::get_data_matrix(fmri_data)
-    } else if ("data" %in% names(fmri_data)) {
-      # Fallback for mock objects
-      data_matrix <- fmri_data$data
+  # Check if it's an fmri_dataset object
+  if (inherits(fmri_data, "fmri_dataset")) {
+    # Get dimensions - handle mock objects that might not have proper dim method
+    dims <- tryCatch(dim(fmri_data), error = function(e) NULL)
+    
+    if (is.null(dims)) {
+      # For mock objects, try to get dimensions from data component
+      if (!is.null(fmri_data$data) && is.matrix(fmri_data$data)) {
+        n_time <- nrow(fmri_data$data)
+        n_voxels <- ncol(fmri_data$data)
+      } else {
+        stop(sprintf("In %s: Cannot determine dimensions of fmri_dataset object", caller), 
+             call. = FALSE)
+      }
     } else {
-      stop(caller, ": fmri_data object missing 'data' field. ",
-           "Ensure your dataset object is properly formatted.", 
-           call. = FALSE)
+      n_dims <- length(dims)
+      n_time <- dims[n_dims]  # Last dimension is time
+      n_voxels <- prod(dims[-n_dims])  # All other dimensions are spatial
     }
-  } else if (is.matrix(fmri_data)) {
-    data_matrix <- fmri_data
-  } else if (is.data.frame(fmri_data)) {
-    warning(caller, ": Converting data.frame to matrix. ",
-            "Consider providing a matrix directly for better performance.")
-    data_matrix <- as.matrix(fmri_data)
-  } else {
-    stop(caller, ": fmri_data must be a matrix, fmri_dataset, or matrix_dataset. ",
-         "Got: ", class(fmri_data)[1], 
-         call. = FALSE)
+    
+    return(list(
+      data = fmri_data,
+      is_fmri_dataset = TRUE,
+      n_time = n_time,
+      n_voxels = n_voxels
+    ))
   }
   
-  # Dimension checks
-  if (!is.matrix(data_matrix)) {
-    stop(caller, ": Failed to extract data matrix from fmri_data.", 
-         call. = FALSE)
+  # Otherwise must be a matrix
+  if (!is.matrix(fmri_data)) {
+    stop(sprintf("In %s: fmri_data must be a matrix or fmri_dataset object. Got: %s",
+                 caller, class(fmri_data)[1]), call. = FALSE)
   }
   
-  dims <- dim(data_matrix)
-  if (length(dims) != 2) {
-    stop(caller, ": fmri_data must be 2D (time x voxels). ",
-         "Got ", length(dims), "D data.", 
-         call. = FALSE)
+  # Check for too few time points first (this handles empty matrices too)
+  if (nrow(fmri_data) < 10) {
+    stop(sprintf("In %s: Insufficient time points (%d). Need at least 10 time points for meaningful HRF estimation.",
+                 caller, nrow(fmri_data)), call. = FALSE)
   }
   
-  n_time <- dims[1]
-  n_vox <- dims[2]
-  
-  if (n_time < 10) {
-    stop(caller, ": Insufficient time points (", n_time, "). ",
-         "Need at least 10 time points for meaningful HRF estimation.", 
-         call. = FALSE)
+  # Check for no voxels
+  if (ncol(fmri_data) == 0) {
+    stop(sprintf("In %s: No voxels found in fMRI data", caller), call. = FALSE)
   }
   
-  if (n_vox < 1) {
-    stop(caller, ": No voxels found in data (columns = ", n_vox, ").", 
-         call. = FALSE)
+  # Check if matrix is numeric (after we know it's not empty)
+  if (!is.numeric(fmri_data)) {
+    stop(sprintf("In %s: fmri_data must be a matrix or fmri_dataset object. Got: %s",
+                 caller, class(fmri_data)[1]), call. = FALSE)
   }
   
-  # Data quality checks
-  if (!is.numeric(data_matrix)) {
-    stop(caller, ": fmri_data must contain numeric values. ",
-         "Found: ", typeof(data_matrix), 
-         call. = FALSE)
-  }
+  # Validate matrix properties
+  spec <- list(
+    name = "fmri_data",
+    type = "matrix",
+    finite = TRUE
+  )
   
-  # Check for NA/NaN/Inf
-  n_na <- sum(is.na(data_matrix))
-  n_inf <- sum(is.infinite(data_matrix))
+  .validate_data(fmri_data, spec, safety_mode = "balanced", caller = caller)
   
-  if (n_na > 0) {
-    prop_na <- n_na / length(data_matrix)
-    if (prop_na > 0.5) {
-      stop(caller, ": More than 50% of data is NA (", 
-           round(prop_na * 100, 1), "%). ",
-           "Check your data preprocessing.", 
-           call. = FALSE)
-    } else if (prop_na > 0.1) {
-      warning(caller, ": ", round(prop_na * 100, 1), 
-              "% of data contains NA values. ",
-              "These will be handled but may affect results.")
-    }
-  }
-  
-  if (n_inf > 0) {
-    stop(caller, ": Data contains ", n_inf, " infinite values. ",
-         "Check for numerical overflow in preprocessing.", 
-         call. = FALSE)
-  }
-  
-  # Check for constant/zero voxels
-  voxel_sds <- apply(data_matrix, 2, sd, na.rm = TRUE)
-  n_constant <- sum(voxel_sds < .Machine$double.eps)
-  n_zero <- sum(colSums(abs(data_matrix), na.rm = TRUE) < .Machine$double.eps)
-  
+  # Check for constant voxels
+  voxel_sds <- apply(fmri_data, 2, sd, na.rm = TRUE)
+  n_constant <- sum(voxel_sds < .Machine$double.eps, na.rm = TRUE)
   if (n_constant > 0) {
-    warning(caller, ": Found ", n_constant, " constant voxels (no variation). ",
-            "These will produce undefined results.")
+    warning(sprintf("In %s: %d voxels have constant values and will produce invalid results",
+                    caller, n_constant), call. = FALSE)
   }
   
-  if (n_zero > 0) {
-    warning(caller, ": Found ", n_zero, " all-zero voxels. ",
-            "These will produce zero parameter estimates.")
-  }
-  
-  # Return validated data
   list(
-    data = data_matrix,
-    n_time = n_time,
-    n_vox = n_vox,
-    n_na = n_na,
-    n_constant = n_constant,
-    n_zero = n_zero,
-    type = class(fmri_data)[1]
+    data = fmri_data,
+    is_fmri_dataset = FALSE,
+    n_time = nrow(fmri_data),
+    n_voxels = ncol(fmri_data)
   )
 }
 
 #' Validate event model
+#'
+#' @param event_model Event model (matrix or event_model object)
+#' @param n_time Number of time points
+#' @param caller Name of calling function
 #' @keywords internal
-.validate_event_model <- function(event_model, n_time, caller = "estimate_parametric_hrf") {
+.validate_event_model <- function(event_model, n_time, caller = "function") {
   if (is.null(event_model)) {
-    stop(caller, ": event_model cannot be NULL. ",
-         "Provide an event_model object or stimulus matrix.", 
-         call. = FALSE)
+    stop(sprintf("In %s: event_model cannot be NULL", caller), call. = FALSE)
   }
   
-  # Handle different input types
+  # Handle event_model objects
   if (inherits(event_model, "event_model")) {
-    # Extract design matrix using fmrireg if available
+    # Extract design matrix from event_model
     if (requireNamespace("fmrireg", quietly = TRUE)) {
-      design_matrix <- as.matrix(fmrireg::design_matrix(event_model))
-    } else if ("terms" %in% names(event_model)) {
-      # Fallback for mock objects
-      if (length(event_model$terms) == 0) {
-        stop(caller, ": event_model contains no terms. ",
-             "Check your event model specification.", 
-             call. = FALSE)
-      }
-      design_matrix <- event_model$terms[[1]]
+      design <- tryCatch({
+        as.matrix(fmrireg::design_matrix(event_model))
+      }, error = function(e) {
+        stop(sprintf("In %s: Cannot extract design matrix from event_model: %s",
+                     caller, e$message), call. = FALSE)
+      })
+      
+      return(list(
+        design = design,
+        type = "event_model",
+        n_events = ncol(design)
+      ))
     } else {
-      stop(caller, ": event_model missing 'terms' field.", 
-           call. = FALSE)
+      stop(sprintf("In %s: fmrireg package required to handle event_model objects",
+                   caller), call. = FALSE)
     }
-  } else if (is.matrix(event_model) || is.numeric(event_model)) {
-    design_matrix <- as.matrix(event_model)
-  } else {
-    stop(caller, ": event_model must be an event_model object or numeric matrix. ",
-         "Got: ", class(event_model)[1], 
-         call. = FALSE)
   }
   
-  # Dimension checks
-  if (nrow(design_matrix) != n_time) {
-    stop(caller, ": event_model time points (", nrow(design_matrix), 
-         ") don't match fmri_data time points (", n_time, ").", 
-         call. = FALSE)
+  # Handle numeric vectors by converting to matrix
+  if (is.numeric(event_model) && is.vector(event_model)) {
+    event_model <- matrix(event_model, ncol = 1)
   }
   
-  # Content checks
-  if (sum(abs(design_matrix), na.rm = TRUE) < .Machine$double.eps) {
-    warning(caller,
-            ": No events detected in event_model. Design matrix may be singular.")
+  # Otherwise must be a matrix
+  if (!is.matrix(event_model)) {
+    stop(sprintf("In %s: event_model must be a matrix or event_model object. Got: %s",
+                 caller, class(event_model)[1]), call. = FALSE)
   }
   
-  event_density <- mean(design_matrix > 0, na.rm = TRUE)
-  if (event_density > 0.9) {
-    warning(caller, ": Very high event density (", 
-            round(event_density * 100), "% of time points). ",
-            "This may lead to poor HRF estimation.")
-  } else if (event_density < 0.01) {
-    warning(caller, ": Very low event density (", 
-            round(event_density * 100, 2), "% of time points). ",
-            "Consider if you have enough events for reliable estimation.")
+  # Check dimensions
+  if (nrow(event_model) != n_time) {
+    stop(sprintf("In %s: event_model rows (%d) must match fmri_data time points (%d)",
+                 caller, nrow(event_model), n_time), call. = FALSE)
   }
   
+  if (ncol(event_model) == 0) {
+    stop(sprintf("In %s: event_model has no events", caller), call. = FALSE)
+  }
+  
+  # Check for empty events
+  event_density <- mean(event_model != 0)
+  if (event_density < 0.01) {
+    perc <- round(event_density * 100, 1)
+    warning(sprintf("In %s: Very low event density (%g%% of time points). Consider if you have enough events for reliable estimation.",
+                    caller, perc), call. = FALSE)
+  }
+  
+  # Return structured result
   list(
-    design = design_matrix,
-    n_events = sum(design_matrix > 0),
-    event_density = event_density,
-    type = class(event_model)[1]
+    design = event_model,
+    type = "matrix",
+    n_events = ncol(event_model),
+    event_density = event_density
   )
 }
 
-#' Validate parameter bounds
+#' Validate theta bounds (delegates to unified validation)
+#'
+#' @param theta_bounds List with lower and upper bounds
+#' @param n_params Number of parameters
+#' @param param_names Optional parameter names
+#' @param caller Calling function name
+#' @return Validated bounds or NULL
 #' @keywords internal
 .validate_theta_bounds <- function(theta_bounds, n_params, param_names = NULL, 
                                    caller = "estimate_parametric_hrf") {
-  if (is.null(theta_bounds)) {
-    return(NULL)  # Use defaults
-  }
-  
-  if (!is.list(theta_bounds)) {
-    stop(caller, ": theta_bounds must be a list with 'lower' and 'upper' elements. ",
-         "Got: ", class(theta_bounds)[1], 
-         call. = FALSE)
-  }
-  
-  if (!all(c("lower", "upper") %in% names(theta_bounds))) {
-    missing <- setdiff(c("lower", "upper"), names(theta_bounds))
-    stop(caller, ": theta_bounds missing required elements: ",
-         paste(missing, collapse = ", "), 
-         call. = FALSE)
-  }
-  
-  lower <- theta_bounds$lower
-  upper <- theta_bounds$upper
-  
-  # Length checks
-  if (length(lower) != n_params || length(upper) != n_params) {
-    stop(caller, ": theta_bounds dimensions incorrect. Expected ", n_params,
-         " parameters, got lower = ", length(lower), ", upper = ", length(upper), 
-         call. = FALSE)
-  }
-  
-  # Numeric checks
-  if (!is.numeric(lower) || !is.numeric(upper)) {
-    stop(caller, ": theta_bounds must contain numeric values.", 
-         call. = FALSE)
-  }
-  
-  # Order checks
-  violations <- which(lower >= upper)
-  if (length(violations) > 0) {
-    param_info <- if (!is.null(param_names)) {
-      paste0(param_names[violations], " (", violations, ")")
-    } else {
-      as.character(violations)
-    }
-    stop(caller, ": theta_bounds: lower must be less than upper for all parameters. ",
-         "Violations at: ", paste(param_info, collapse = ", "), 
-         call. = FALSE)
-  }
-  
-  # Physiological plausibility checks for LWU
-  if (!is.null(param_names) && length(param_names) == 3 && 
-      all(param_names == c("tau", "sigma", "rho"))) {
-    
-    # Tau (lag) checks
-    if (lower[1] < 0) {
-      warning(caller, ": tau lower bound < 0 is non-physiological. Consider using >= 0.")
-    }
-    if (upper[1] > 30) {
-      warning(caller, ": tau upper bound > 30s is unusually high for HRF peak time.")
-    }
-    
-    # Sigma (width) checks  
-    if (lower[2] < 0.1) {
-      warning(caller, ": sigma lower bound < 0.1 may cause numerical instability.")
-    }
-    if (upper[2] > 20) {
-      warning(caller, ": sigma upper bound > 20s is unusually wide for HRF.")
-    }
-    
-    # Rho (undershoot) checks
-    if (lower[3] < 0) {
-      warning(caller, ": rho lower bound < 0 prevents undershoot modeling.")
-    }
-    if (upper[3] > 2) {
-      warning(caller, ": rho upper bound > 2 is non-physiological for undershoot ratio.")
-    }
-  }
-  
-  theta_bounds
+  .validate_bounds(theta_bounds, n_params, param_names, caller)
 }
 
-#' Validate numeric parameters
+#' Validate numeric parameter (legacy wrapper)
+#'
+#' @param x Numeric value to validate
+#' @param name Parameter name
+#' @param min_val Minimum value
+#' @param max_val Maximum value
+#' @param allow_null Whether NULL is allowed
+#' @param default Default value if NULL
+#' @param caller Calling function name
+#' @return Validated value
 #' @keywords internal
 .validate_numeric_param <- function(x, name, min_val = -Inf, max_val = Inf, 
                                     allow_null = TRUE, default = NULL,
                                     caller = "estimate_parametric_hrf") {
-  if (is.null(x)) {
-    if (allow_null) {
-      return(default)
-    } else {
-      stop(caller, ": ", name, " cannot be NULL.", call. = FALSE)
-    }
+  # Handle NULL with default early
+  if (is.null(x) && allow_null) {
+    return(default)
   }
   
-  if (!is.numeric(x) || length(x) != 1) {
-    stop(caller, ": ", name, " must be a single numeric value. ",
-         "Got: ", class(x)[1], " of length ", length(x), 
-         call. = FALSE)
+  # Special handling for NA
+  if (length(x) == 1 && is.na(x)) {
+    stop(sprintf("In %s: %s must be a single numeric value. Got: %s", 
+                 caller, name, class(x)[1]), call. = FALSE)
   }
   
-  if (is.na(x)) {
-    stop(caller, ": ", name, " cannot be NA.", call. = FALSE)
+  # Special handling for infinite values
+  if (length(x) == 1 && is.infinite(x)) {
+    stop(sprintf("In %s: %s cannot be infinite", caller, name), call. = FALSE)
   }
   
-  if (is.infinite(x)) {
-    stop(caller, ": ", name, " cannot be infinite.", call. = FALSE)
+  constraints <- list(
+    null_ok = allow_null,
+    finite = TRUE
+  )
+  
+  if (is.finite(min_val) || is.finite(max_val)) {
+    constraints$range <- c(min_val, max_val)
   }
   
-  if (x < min_val || x > max_val) {
-    stop(caller, ": ", name, " = ", x, " is outside valid range [",
-         min_val, ", ", max_val, "].", 
-         call. = FALSE)
-  }
-  
-  x
+  .validate_numeric(x, name, constraints, caller)
 }
 
-#' Master validation function
+#' Master validation function for comprehensive mode
 #'
-#' This helper is invoked when `validation_level` is set to
-#' "comprehensive" and applies every available validation routine.
+#' @param fmri_data fMRI data
+#' @param event_model Event model
+#' @param parametric_model Model name
+#' @param theta_seed Seed parameters
+#' @param theta_bounds Parameter bounds
+#' @param hrf_span HRF span
+#' @param lambda_ridge Ridge parameter
+#' @param recenter_global_passes Global passes
+#' @param recenter_epsilon Convergence epsilon
+#' @param r2_threshold R-squared threshold
+#' @param mask Optional mask
+#' @param verbose Verbose output
+#' @param caller Calling function
 #' @keywords internal
 .rock_solid_validate_inputs <- function(
   fmri_data,
   event_model,
-  parametric_hrf,
+  parametric_model,
   theta_seed,
   theta_bounds,
   hrf_span,
@@ -324,60 +244,120 @@
   recenter_global_passes,
   recenter_epsilon,
   r2_threshold,
-  mask,
-  verbose,
+  mask = NULL,
+  verbose = TRUE,
   caller = "estimate_parametric_hrf"
 ) {
   
-  if (verbose) cat("Performing comprehensive input validation...\n")
+  if (verbose) {
+    cat("  [Validation] Starting comprehensive input validation...\n")
+  }
   
-  # Core data validation
-  fmri_valid <- .validate_fmri_data(fmri_data, caller)
-  event_valid <- .validate_event_model(event_model, fmri_valid$n_time, caller)
+  # fMRI data validation
+  fmri_info <- .validate_fmri_data(fmri_data, caller)
+  n_time <- fmri_info$n_time
+  n_voxels <- fmri_info$n_voxels
+  
+  # Event model validation
+  event_info <- .validate_event_model(event_model, n_time, caller)
   
   # Model validation
-  if (!is.character(parametric_hrf) || length(parametric_hrf) != 1) {
-    stop(caller, ": parametric_hrf must be a single character string.", 
-         call. = FALSE)
+  if (!identical(tolower(parametric_model), "lwu")) {
+    stop(sprintf("In %s: Only 'lwu' model currently supported. Got: '%s'", 
+                 caller, parametric_model), call. = FALSE)
   }
   
-  if (tolower(parametric_hrf) != "lwu") {
-    stop(caller, ": Only 'lwu' model currently supported. Got: '", parametric_hrf, "'", 
-         call. = FALSE)
-  }
-  
-  # Numeric parameter validation
+  # Numeric parameters
   hrf_span <- .validate_numeric_param(hrf_span, "hrf_span", 
-                                      min_val = 5, max_val = 60, 
-                                      default = 30, caller = caller)
+                                      min_val = 5, max_val = 60,
+                                      allow_null = TRUE, default = 30, caller = caller)
   
   lambda_ridge <- .validate_numeric_param(lambda_ridge, "lambda_ridge",
                                           min_val = 0, max_val = 10,
-                                          default = 0.01, caller = caller)
+                                          allow_null = TRUE, default = 0.01, caller = caller)
   
   recenter_global_passes <- .validate_numeric_param(recenter_global_passes, 
                                                     "recenter_global_passes",
                                                     min_val = 0, max_val = 20,
-                                                    default = 3, caller = caller)
+                                                    allow_null = TRUE, default = 3, caller = caller)
   
   recenter_epsilon <- .validate_numeric_param(recenter_epsilon, "recenter_epsilon",
-                                              min_val = 1e-10, max_val = 1,
-                                              default = 0.01, caller = caller)
+                                              min_val = 1e-6, max_val = 1,
+                                              allow_null = TRUE, default = 0.01, caller = caller)
   
   r2_threshold <- .validate_numeric_param(r2_threshold, "r2_threshold",
-                                          min_val = -1, max_val = 1,
-                                          default = 0.1, caller = caller)
+                                          min_val = 0, max_val = 1,
+                                          allow_null = TRUE, default = 0.1, caller = caller)
   
-  # Return validated inputs
-  list(
-    fmri_data = fmri_valid,
-    event_model = event_valid,
-    parametric_hrf = tolower(parametric_hrf),
+  # Bounds validation
+  if (!is.null(theta_bounds)) {
+    theta_bounds <- .validate_theta_bounds(theta_bounds, n_params = 3, 
+                                          param_names = c("tau", "sigma", "rho"),
+                                          caller = caller)
+  }
+  
+  # Seed validation
+  if (!is.null(theta_seed) && !identical(theta_seed, "data_driven")) {
+    if (!is.numeric(theta_seed) || length(theta_seed) != 3) {
+      stop(caller, ": theta_seed must be numeric vector of length 3 or 'data_driven'. ",
+           "Got: ", class(theta_seed)[1], " of length ", length(theta_seed), 
+           call. = FALSE)
+    }
+    
+    if (any(!is.finite(theta_seed))) {
+      stop(caller, ": theta_seed must contain finite values.", call. = FALSE)
+    }
+  }
+  
+  # Mask validation
+  if (!is.null(mask)) {
+    if (!is.logical(mask) && !is.numeric(mask)) {
+      stop(caller, ": mask must be logical or numeric. Got: ", 
+           class(mask)[1], call. = FALSE)
+    }
+    
+    if (length(mask) != n_voxels) {
+      stop(caller, ": mask length (", length(mask), 
+           ") must match number of voxels (", n_voxels, ")", 
+           call. = FALSE)
+    }
+    
+    # Convert to logical
+    if (is.numeric(mask)) {
+      mask <- mask != 0
+    }
+    
+    if (sum(mask) == 0) {
+      stop(caller, ": mask excludes all voxels", call. = FALSE)
+    }
+  }
+  
+  if (verbose) {
+    cat("  [Validation] All inputs validated successfully\n")
+    cat(sprintf("    - Data: %d timepoints x %d voxels\n", n_time, n_voxels))
+    if (!is.null(mask)) {
+      cat(sprintf("    - Mask: %d active voxels\n", sum(mask)))
+    }
+  }
+  
+  # Return validated data structure
+  return(list(
+    fmri_data = list(
+      data = fmri_info$data,
+      is_fmri_dataset = fmri_info$is_fmri_dataset,
+      n_time = n_time,
+      n_vox = n_voxels
+    ),
+    event_model = event_info$design,
+    parametric_model = tolower(parametric_model),
+    theta_seed = theta_seed,
+    theta_bounds = theta_bounds,
     hrf_span = hrf_span,
     lambda_ridge = lambda_ridge,
-    recenter_global_passes = as.integer(recenter_global_passes),
+    recenter_global_passes = recenter_global_passes,
     recenter_epsilon = recenter_epsilon,
     r2_threshold = r2_threshold,
-    verbose = isTRUE(verbose)
-  )
+    mask = mask,
+    verbose = verbose
+  ))
 }

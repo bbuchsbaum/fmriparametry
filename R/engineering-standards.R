@@ -1,3 +1,33 @@
+# ============================================================================
+# ENGINEERING STANDARDS MODULE
+# ============================================================================
+#
+# Purpose: Central repository for code quality standards and utilities
+#
+# This module establishes consistent engineering practices across the 
+# fmriparametric package to ensure reliability, maintainability, and
+# robustness of the codebase.
+#
+# Key principles:
+# 1. Defensive programming - validate inputs early and comprehensively
+# 2. Fail fast - detect problems as soon as possible
+# 3. Clear error messages - help users understand and fix issues
+# 4. Numerical robustness - handle edge cases and numerical issues gracefully
+# 5. Consistent interfaces - standardize function signatures and returns
+#
+# Standards implemented:
+# - Input validation with type checking and constraint enforcement
+# - Standardized error messaging through diagnostics module
+# - Numerical stability checks and safe operations
+# - Output quality assertions
+#
+# Usage:
+# All internal functions should use these utilities rather than
+# implementing their own validation or error handling. This ensures
+# consistency and makes it easier to update standards across the package.
+#
+# ============================================================================
+
 #' Engineering Standards for fmriparametric
 #'
 #' This file defines the engineering standards and utilities that ensure
@@ -12,116 +42,37 @@
 #' @param type Expected type(s)
 #' @param dims Expected dimensions (NULL to skip)
 #' @param constraints List of constraints (range, properties, etc.)
-#' @keywords internal
+#' @param null_ok Logical whether NULL is acceptable
+#' @noRd
 .validate_input <- function(x, arg_name, type = NULL, dims = NULL, 
                            constraints = NULL, null_ok = FALSE) {
-  # NULL handling
-  if (is.null(x)) {
-    if (null_ok) return(invisible(TRUE))
-    stop(sprintf("Argument '%s' cannot be NULL", arg_name), call. = FALSE)
-  }
+  # Build spec for unified validation
+  spec <- list(
+    name = arg_name,
+    null_ok = null_ok
+  )
   
-  # Type validation
+  # Handle type - convert to simpler format for .validate_data
   if (!is.null(type)) {
-    if (!inherits(x, type)) {
-      stop(sprintf(
-        "Argument '%s' must be of type %s, got %s",
-        arg_name, 
-        paste(type, collapse = " or "),
-        paste(class(x), collapse = ", ")
-      ), call. = FALSE)
-    }
+    # Take first type if multiple given
+    spec$type <- type[1]
   }
   
-  # Dimension validation
-  if (!is.null(dims)) {
-    actual_dims <- if (is.matrix(x) || is.array(x)) dim(x) else length(x)
-    
-    if (length(dims) != length(actual_dims) || !all(dims == actual_dims | dims == -1)) {
-      stop(sprintf(
-        "Argument '%s' must have dimensions %s, got %s",
-        arg_name,
-        paste(dims, collapse = " x "),
-        paste(actual_dims, collapse = " x ")
-      ), call. = FALSE)
-    }
+  # Handle dimensions
+  if (!is.null(dims) && length(dims) == 2) {
+    spec$dims <- list(nrow = dims[1], ncol = dims[2])
   }
   
-  # Constraint validation
+  # Merge constraints
   if (!is.null(constraints)) {
-    .validate_constraints(x, arg_name, constraints)
+    spec <- c(spec, constraints)
   }
+  
+  # Use unified validation
+  result <- .validate_data(x, spec, safety_mode = "balanced", caller = "validate_input")
   
   invisible(TRUE)
 }
 
-#' Validate numerical constraints
-#' @keywords internal
-.validate_constraints <- function(x, arg_name, constraints) {
-  # Range constraints
-  if (!is.null(constraints$range)) {
-    if (any(x < constraints$range[1] | x > constraints$range[2], na.rm = TRUE)) {
-      stop(sprintf(
-        "Argument '%s' contains values outside range [%g, %g]",
-        arg_name, constraints$range[1], constraints$range[2]
-      ), call. = FALSE)
-    }
-  }
-  
-  # Finite values
-  if (isTRUE(constraints$finite)) {
-    if (any(!is.finite(x))) {
-      stop(sprintf(
-        "Argument '%s' must contain only finite values",
-        arg_name
-      ), call. = FALSE)
-    }
-  }
-  
-  # Positive values
-  if (isTRUE(constraints$positive)) {
-    if (any(x <= 0, na.rm = TRUE)) {
-      stop(sprintf(
-        "Argument '%s' must contain only positive values",
-        arg_name
-      ), call. = FALSE)
-    }
-  }
-}
 
 # Numerical Robustness --------------------------------------------------------
-
-
-# Engineering Standards Options -----------------------------------------------
-
-#' Set engineering standards options
-#' @export
-set_engineering_options <- function(
-  verbose = FALSE,
-  validate = TRUE,
-  profile = FALSE,
-  precision = "double",
-  debug = FALSE
-) {
-  options(
-    fmriparametric.verbose = verbose,
-    fmriparametric.validate = validate,
-    fmriparametric.profile = profile,
-    fmriparametric.precision = precision,
-    fmriparametric.debug = debug
-  )
-  
-  if (debug) {
-    message("Engineering standards: DEBUG mode enabled")
-    message("  - All validations active")
-    message("  - Profiling enabled")
-    message("  - Verbose output")
-    options(
-      fmriparametric.verbose = TRUE,
-      fmriparametric.validate = TRUE,
-      fmriparametric.profile = TRUE
-    )
-  }
-  
-  invisible(NULL)
-}

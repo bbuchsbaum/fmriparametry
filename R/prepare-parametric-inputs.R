@@ -94,7 +94,13 @@
 
   # Step 5: HRF evaluation times
   if (is.null(hrf_eval_times)) {
-    dt <- if (length(scan_times) > 1) median(diff(scan_times)) else 1
+    scan_dt <- if (length(scan_times) > 1) median(diff(scan_times)) else 1
+    # Use a sub-TR grid for small/medium problems where it improves
+    # linearization stability; keep native TR for very large voxel sets.
+    dt <- if (ncol(Y_raw) > 200) scan_dt else min(scan_dt, 0.5)
+    if (!is.finite(dt) || dt <= 0) {
+      dt <- 0.5
+    }
     hrf_eval_times <- seq(0, hrf_span, by = dt)
   }
 

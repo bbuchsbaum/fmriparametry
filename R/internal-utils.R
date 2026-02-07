@@ -16,9 +16,11 @@
 #' @param signal Numeric vector or single-column matrix of the signal to convolve
 #' @param kernels Matrix of kernel functions (columns are different kernels)
 #' @param output_length Desired output length
+#' @param conv_context Optional precomputed convolution context from
+#'   `.prepare_fft_convolution_context()`.
 #' @return Matrix with convolved signals (one column per kernel)
 #' @keywords internal
-.convolve_signal_with_kernels <- function(signal, kernels, output_length) {
+.convolve_signal_with_kernels <- function(signal, kernels, output_length, conv_context = NULL) {
   # Ensure signal is a matrix column
   if (is.null(dim(signal))) {
     signal <- matrix(signal, ncol = 1)
@@ -29,7 +31,7 @@
   
   # Use the optimized batch convolution
   # This maintains consistency with the core engine's convolution approach
-  .fast_batch_convolution(signal, kernels, output_length)
+  .fast_batch_convolution(signal, kernels, output_length, conv_context = conv_context)
 }
 
 .fmriparametric_internal <- new.env(parent = emptyenv())
@@ -366,4 +368,3 @@ get_timing_report <- function() {
 
   invisible(TRUE)
 }
-

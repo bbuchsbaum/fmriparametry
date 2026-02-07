@@ -3,7 +3,7 @@
 #' @param X Design matrix (time x parameters)
 #' @param Y Response matrix (time x voxels)
 #' @param lambda_ridge Non-negative numeric ridge penalty (scalar)
-#' @keywords internal
+#' @noRd
 .ridge_linear_solve <- function(X, Y, lambda_ridge = 0) {
   # Ensure inputs are matrices
   if (!is.matrix(X)) {

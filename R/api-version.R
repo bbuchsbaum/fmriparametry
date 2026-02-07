@@ -9,9 +9,9 @@
 #' @export
 #' @examples
 #' if (fmriparametric_api_version() < "0.3.0") {
-#'   warning("This script was designed for a newer version of fmriparametry.")
+#'   warning("This script was designed for a newer version of fmriparametric.")
 #' }
 fmriparametric_api_version <- function() {
-  utils::packageDescription("fmriparametry")$Version
+  utils::packageDescription("fmriparametric")$Version
 }
 

@@ -1,3 +1,4 @@
+#' @noRd
 .onLoad <- function(libname, pkgname) {
   if (exists(".on_load_options", envir = asNamespace(pkgname))) {
     get(".on_load_options", envir = asNamespace(pkgname))(libname, pkgname)
@@ -23,6 +24,7 @@
   }
 }
 
+#' @noRd
 .onUnload <- function(libpath) {
   library.dynam.unload("fmriparametric", libpath)
 }

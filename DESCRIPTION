@@ -3,8 +3,7 @@ Type: Package
 Title: Extensible Parametric HRF Estimation for fMRI Data
 Version: 0.2.0
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
+    person("Brad", "Buchsbaum", , "brad.buchsbaum@gmail.com", role = c("aut", "cre"))
 Description: Provides robust and efficient tools for estimating parameters of 
     parametric Hemodynamic Response Function (HRF) models from fMRI data. Using 
     an iterative linear Taylor approximation method, it enables voxel-wise 
@@ -22,6 +21,7 @@ Depends:
 Imports:
     fmrireg (>= 0.1.0),
     fmrihrf (>= 0.1.0),
+    fmridataset (>= 0.1.0),
     rlang,
     assertthat,
     Matrix,
@@ -39,6 +39,7 @@ Suggests:
     future,
     progressr,
     ggplot2,
+    gridExtra,
     numDeriv,
     testthat (>= 3.0.0),
     knitr,
@@ -50,4 +51,5 @@ URL: https://github.com/bbuchsbaum/fmriparametry
 BugReports: https://github.com/bbuchsbaum/fmriparametry/issues 
 Remotes:
     bbuchsbaum/fmrireg,
-    bbuchsbaum/fmrihrf
+    bbuchsbaum/fmrihrf,
+    bbuchsbaum/fmridataset

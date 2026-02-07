@@ -1,3 +1,28 @@
+# ============================================================================
+# EXPERIMENTAL FEATURE: Bayesian HRF Estimation Engine
+# ============================================================================
+#
+# Status: EXPERIMENTAL - Subject to change without notice
+# Purpose: Proof-of-concept for Bayesian HRF parameter estimation
+# 
+# This module implements a simplified Bayesian approach to HRF estimation,
+# primarily for testing the extensibility of the package architecture.
+# It is not optimized for production use and may have limitations.
+#
+# Key limitations:
+# - Only supports single-column design matrices
+# - Treats HRF shape parameters as fixed (only estimates amplitude)
+# - Uses conjugate priors for computational simplicity
+# - No support for hierarchical models or spatial priors
+#
+# Future development may include:
+# - Full Bayesian estimation of all HRF parameters
+# - Hierarchical models for multi-subject analysis
+# - Spatial priors for smoothing
+# - Variational inference as an alternative to MCMC
+#
+# ============================================================================
+
 #' Simple Bayesian HRF estimation engine
 #'
 #' This is a lightweight Bayesian alternative used mainly for testing the
@@ -9,7 +34,7 @@
 #' @param priors List with elements `mean`, `var` and `sigma2`
 #' @param mcmc_samples Number of posterior samples to draw
 #' @return List with posterior mean, sd and samples
-#' @keywords internal
+#' @noRd
 .bayesian_engine <- function(Y, X, priors, mcmc_samples = 1000) {
   # Validate Y and X
   if (!is.numeric(Y) || !is.vector(Y)) {
