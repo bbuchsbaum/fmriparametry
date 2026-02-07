@@ -1,16 +1,6 @@
 # Shared utilities for HRF estimation
 # These functions are used by both legacy and refactored implementations
 
-#' Create HRF interface
-#' 
-#' Creates an interface object for the specified HRF model
-#' 
-#' @param model Character string specifying the HRF model (default: "lwu")
-#' @return HRF interface object with methods for evaluation and derivatives
-#' @keywords internal
-.create_hrf_interface <- function(model = "lwu") {
-  .get_hrf_interface(model)
-}
 
 #' Compute data-driven initial HRF parameters
 #'
@@ -35,13 +25,27 @@
 
   # Cross correlation with stimulus
   lags <- seq(-8, 12, by = 1)
+  
+  # Extract stimulus column as vector and ensure proper length
+  stim_vec <- if (is.matrix(S)) S[, 1] else as.vector(S)
+  n_time <- length(y_mean)
+  
+  # Ensure stimulus vector has same length as y_mean
+  if (length(stim_vec) != n_time) {
+    stim_vec <- stim_vec[1:n_time]
+  }
+  
   cors <- vapply(lags, function(l) {
     if (l >= 0) {
-      s_shift <- c(rep(0, l), S[, 1])[1:nrow(S)]
+      s_shift <- c(rep(0, l), stim_vec)[1:n_time]
     } else {
-      s_shift <- c(S[, 1], rep(0, -l))[(-l + 1):nrow(S)]
+      s_shift <- c(stim_vec, rep(0, -l))[(-l + 1):(n_time - l)]
     }
-    stats::cor(y_mean, s_shift, use = "complete.obs")
+    # Ensure both are vectors of same length
+    if (length(s_shift) != n_time) {
+      s_shift <- s_shift[1:n_time]
+    }
+    stats::cor(as.vector(y_mean), as.vector(s_shift), use = "complete.obs")
   }, numeric(1))
 
   best_lag <- lags[which.max(abs(cors))]
@@ -82,7 +86,7 @@
   n_time <- nrow(Y)
 
   # Matrix-based cross-correlation for all voxels simultaneously
-  stim <- S[, 1]
+  stim <- if (is.matrix(S)) S[, 1] else S
   stim_shifts <- vapply(delays, function(l) {
     if (l >= 0) {
       c(rep(0, l), stim)[1:n_time]
@@ -123,7 +127,7 @@
 #' their R-squared values and, optionally, standard errors.
 #' 
 #' @param r_squared Vector of R-squared values
-#' @param se_theta Matrix of standard errors (voxels x parameters), or NULL for R²-only mode
+#' @param se_theta Matrix of standard errors (voxels x parameters), or NULL for R^2-only mode
 #' @param thresholds List with classification thresholds (r2_easy, r2_hard, se_low, se_high)
 #' @return Character vector of voxel classifications
 #' @keywords internal
@@ -147,10 +151,10 @@
     }
     mean_se <- rowMeans(se_theta, na.rm = TRUE)
     
-    # Easy: high R² AND low SE
+    # Easy: high R^2 AND low SE
     easy_mask <- easy_mask_r2 & (mean_se < thresholds$se_low)
     
-    # Hard: low R² OR high SE
+    # Hard: low R^2 OR high SE
     hard_mask <- hard_mask_r2 | (mean_se > thresholds$se_high)
   }
   

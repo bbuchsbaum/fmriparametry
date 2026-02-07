@@ -5,6 +5,26 @@ fast_batch_convolution_cpp <- function(signal, kernels, output_length) {
     .Call(`_fmriparametric_fast_batch_convolution_cpp`, signal, kernels, output_length)
 }
 
+calculate_fit_metrics_cpp <- function(y_true, y_pred, has_intercept = TRUE, precomputed_tss = NULL, tolerance = 1e-10) {
+    .Call(`_fmriparametric_calculate_fit_metrics_cpp`, y_true, y_pred, has_intercept, precomputed_tss, tolerance)
+}
+
+lwu_hrf_formula_cpp <- function(t, tau, sigma, rho, normalize = "none") {
+    .Call(`_fmriparametric_lwu_hrf_formula_cpp`, t, tau, sigma, rho, normalize)
+}
+
+lwu_taylor_basis_fd_cpp <- function(params_vector0, t_hrf_eval, lower, upper, rel_step = 1e-4, min_step = 1e-5, bound_eps = 1e-8) {
+    .Call(`_fmriparametric_lwu_taylor_basis_fd_cpp`, params_vector0, t_hrf_eval, lower, upper, rel_step, min_step, bound_eps)
+}
+
+lwu_gn_objective_cpp <- function(theta, y, signal, t_hrf_eval, lower, upper) {
+    .Call(`_fmriparametric_lwu_gn_objective_cpp`, theta, y, signal, t_hrf_eval, lower, upper)
+}
+
+lwu_gn_jacobian_cpp <- function(theta, y, signal, t_hrf_eval, lower, upper, rel_step = 1e-4, min_step = 1e-5, bound_eps = 1e-8) {
+    .Call(`_fmriparametric_lwu_gn_jacobian_cpp`, theta, y, signal, t_hrf_eval, lower, upper, rel_step, min_step, bound_eps)
+}
+
 ridge_linear_solve_cpp <- function(X, Y, lambda) {
     .Call(`_fmriparametric_ridge_linear_solve_cpp`, X, Y, lambda)
 }

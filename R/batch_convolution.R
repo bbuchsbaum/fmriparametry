@@ -25,17 +25,17 @@
   # Initialize result matrix
   result <- matrix(0, nrow = output_length, ncol = ncol(kernels))
   
-  # DEBUG: Check inputs
+  # DEBUG: Check inputs (commented out for production)
   debug_mode <- getOption("fmriparametric.debug", FALSE)
-  if (debug_mode || all(abs(signals) < 1e-10)) {
-    cat("\n=== BATCH CONVOLUTION DEBUG ===\n")
-    cat("signals dim:", dim(signals), "\n")
-    cat("signals range:", range(signals), "\n")
-    cat("signals sum:", sum(abs(signals)), "\n")
-    cat("kernels dim:", dim(kernels), "\n")
-    cat("kernels[,1] (HRF) range:", range(kernels[,1]), "\n")
-    cat("output_length:", output_length, "\n")
-  }
+  # if (debug_mode || all(abs(signals) < 1e-10)) {
+  #   cat("\n=== BATCH CONVOLUTION DEBUG ===\n")
+  #   cat("signals dim:", dim(signals), "\n")
+  #   cat("signals range:", range(signals), "\n")
+  #   cat("signals sum:", sum(abs(signals)), "\n")
+  #   cat("kernels dim:", dim(kernels), "\n")
+  #   cat("kernels[,1] (HRF) range:", range(kernels[,1]), "\n")
+  #   cat("output_length:", output_length, "\n")
+  # }
   
   # Optimize: If summing signals, convolution is linear so we can sum first
   # This is much faster than looping
@@ -61,10 +61,10 @@
     stop(".batch_convolution: .fast_batch_convolution returned non-matrix")
   }
   
-  if (debug_mode || all(abs(signals) < 1e-10)) {
-    cat("Final result range:", range(result), "\n")
-    cat("================================\n\n")
-  }
+  # if (debug_mode || all(abs(signals) < 1e-10)) {
+  #   cat("Final result range:", range(result), "\n")
+  #   cat("================================\n\n")
+  # }
   
   # Ensure we return a matrix
   if (!is.matrix(result)) {

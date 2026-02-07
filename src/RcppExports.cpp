@@ -24,6 +24,88 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// calculate_fit_metrics_cpp
+Rcpp::List calculate_fit_metrics_cpp(const NumericMatrix& y_true, const NumericMatrix& y_pred, const bool has_intercept, Nullable<NumericVector> precomputed_tss, const double tolerance);
+RcppExport SEXP _fmriparametric_calculate_fit_metrics_cpp(SEXP y_trueSEXP, SEXP y_predSEXP, SEXP has_interceptSEXP, SEXP precomputed_tssSEXP, SEXP toleranceSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type y_true(y_trueSEXP);
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type y_pred(y_predSEXP);
+    Rcpp::traits::input_parameter< const bool >::type has_intercept(has_interceptSEXP);
+    Rcpp::traits::input_parameter< Nullable<NumericVector> >::type precomputed_tss(precomputed_tssSEXP);
+    Rcpp::traits::input_parameter< const double >::type tolerance(toleranceSEXP);
+    rcpp_result_gen = Rcpp::wrap(calculate_fit_metrics_cpp(y_true, y_pred, has_intercept, precomputed_tss, tolerance));
+    return rcpp_result_gen;
+END_RCPP
+}
+// lwu_hrf_formula_cpp
+NumericVector lwu_hrf_formula_cpp(const NumericVector& t, const double tau, const double sigma, const double rho, std::string normalize);
+RcppExport SEXP _fmriparametric_lwu_hrf_formula_cpp(SEXP tSEXP, SEXP tauSEXP, SEXP sigmaSEXP, SEXP rhoSEXP, SEXP normalizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type t(tSEXP);
+    Rcpp::traits::input_parameter< const double >::type tau(tauSEXP);
+    Rcpp::traits::input_parameter< const double >::type sigma(sigmaSEXP);
+    Rcpp::traits::input_parameter< const double >::type rho(rhoSEXP);
+    Rcpp::traits::input_parameter< std::string >::type normalize(normalizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(lwu_hrf_formula_cpp(t, tau, sigma, rho, normalize));
+    return rcpp_result_gen;
+END_RCPP
+}
+// lwu_taylor_basis_fd_cpp
+NumericMatrix lwu_taylor_basis_fd_cpp(const NumericVector& params_vector0, const NumericVector& t_hrf_eval, const NumericVector& lower, const NumericVector& upper, const double rel_step, const double min_step, const double bound_eps);
+RcppExport SEXP _fmriparametric_lwu_taylor_basis_fd_cpp(SEXP params_vector0SEXP, SEXP t_hrf_evalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP rel_stepSEXP, SEXP min_stepSEXP, SEXP bound_epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type params_vector0(params_vector0SEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type t_hrf_eval(t_hrf_evalSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< const double >::type rel_step(rel_stepSEXP);
+    Rcpp::traits::input_parameter< const double >::type min_step(min_stepSEXP);
+    Rcpp::traits::input_parameter< const double >::type bound_eps(bound_epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(lwu_taylor_basis_fd_cpp(params_vector0, t_hrf_eval, lower, upper, rel_step, min_step, bound_eps));
+    return rcpp_result_gen;
+END_RCPP
+}
+// lwu_gn_objective_cpp
+double lwu_gn_objective_cpp(const NumericVector& theta, const NumericVector& y, const NumericVector& signal, const NumericVector& t_hrf_eval, const NumericVector& lower, const NumericVector& upper);
+RcppExport SEXP _fmriparametric_lwu_gn_objective_cpp(SEXP thetaSEXP, SEXP ySEXP, SEXP signalSEXP, SEXP t_hrf_evalSEXP, SEXP lowerSEXP, SEXP upperSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type signal(signalSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type t_hrf_eval(t_hrf_evalSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type upper(upperSEXP);
+    rcpp_result_gen = Rcpp::wrap(lwu_gn_objective_cpp(theta, y, signal, t_hrf_eval, lower, upper));
+    return rcpp_result_gen;
+END_RCPP
+}
+// lwu_gn_jacobian_cpp
+List lwu_gn_jacobian_cpp(const NumericVector& theta, const NumericVector& y, const NumericVector& signal, const NumericVector& t_hrf_eval, const NumericVector& lower, const NumericVector& upper, const double rel_step, const double min_step, const double bound_eps);
+RcppExport SEXP _fmriparametric_lwu_gn_jacobian_cpp(SEXP thetaSEXP, SEXP ySEXP, SEXP signalSEXP, SEXP t_hrf_evalSEXP, SEXP lowerSEXP, SEXP upperSEXP, SEXP rel_stepSEXP, SEXP min_stepSEXP, SEXP bound_epsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericVector& >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type signal(signalSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type t_hrf_eval(t_hrf_evalSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type lower(lowerSEXP);
+    Rcpp::traits::input_parameter< const NumericVector& >::type upper(upperSEXP);
+    Rcpp::traits::input_parameter< const double >::type rel_step(rel_stepSEXP);
+    Rcpp::traits::input_parameter< const double >::type min_step(min_stepSEXP);
+    Rcpp::traits::input_parameter< const double >::type bound_eps(bound_epsSEXP);
+    rcpp_result_gen = Rcpp::wrap(lwu_gn_jacobian_cpp(theta, y, signal, t_hrf_eval, lower, upper, rel_step, min_step, bound_eps));
+    return rcpp_result_gen;
+END_RCPP
+}
 // ridge_linear_solve_cpp
 Eigen::MatrixXd ridge_linear_solve_cpp(const Eigen::Map<Eigen::MatrixXd>& X, const Eigen::Map<Eigen::MatrixXd>& Y, double lambda);
 RcppExport SEXP _fmriparametric_ridge_linear_solve_cpp(SEXP XSEXP, SEXP YSEXP, SEXP lambdaSEXP) {
@@ -55,6 +137,11 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_fmriparametric_fast_batch_convolution_cpp", (DL_FUNC) &_fmriparametric_fast_batch_convolution_cpp, 3},
+    {"_fmriparametric_calculate_fit_metrics_cpp", (DL_FUNC) &_fmriparametric_calculate_fit_metrics_cpp, 5},
+    {"_fmriparametric_lwu_hrf_formula_cpp", (DL_FUNC) &_fmriparametric_lwu_hrf_formula_cpp, 5},
+    {"_fmriparametric_lwu_taylor_basis_fd_cpp", (DL_FUNC) &_fmriparametric_lwu_taylor_basis_fd_cpp, 7},
+    {"_fmriparametric_lwu_gn_objective_cpp", (DL_FUNC) &_fmriparametric_lwu_gn_objective_cpp, 6},
+    {"_fmriparametric_lwu_gn_jacobian_cpp", (DL_FUNC) &_fmriparametric_lwu_gn_jacobian_cpp, 9},
     {"_fmriparametric_ridge_linear_solve_cpp", (DL_FUNC) &_fmriparametric_ridge_linear_solve_cpp, 3},
     {"_fmriparametric_compute_standard_errors_bulk_cpp", (DL_FUNC) &_fmriparametric_compute_standard_errors_bulk_cpp, 5},
     {NULL, NULL, 0}

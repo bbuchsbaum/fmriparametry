@@ -67,48 +67,33 @@
   
   n_obs <- nrow(y_true)
   n_vox <- ncol(y_true)
-  
-  # Calculate residuals and RSS
-  residuals <- y_true - y_pred
-  rss <- colSums(residuals^2)
-  
-  # Calculate TSS
+
+  # Validate pre-computed TSS length before calling C++.
   if (!is.null(precomputed_tss)) {
-    # Use pre-computed TSS (e.g., from original data before residualization)
     if (length(precomputed_tss) != n_vox) {
       stop(sprintf("precomputed_tss length (%d) must match number of voxels (%d)",
                    length(precomputed_tss), n_vox), call. = FALSE)
     }
-    tss <- precomputed_tss
-  } else {
-    if (has_intercept) {
-      # Standard R²: variance around the mean
-      y_mean <- colMeans(y_true)
-      tss <- colSums(sweep(y_true, 2, y_mean)^2)
-    } else {
-      # Uncentered R²: variance around zero
-      tss <- colSums(y_true^2)
-    }
   }
-  
-  # Calculate R-squared with edge case handling
-  r_squared <- numeric(n_vox)
-  for (v in seq_len(n_vox)) {
-    if (abs(tss[v]) < tolerance) {
-      # Zero variance in y_true
-      if (abs(rss[v]) < tolerance) {
-        # Perfect prediction of constant
-        r_squared[v] <- 1.0
-      } else {
-        # Failed to predict constant
-        r_squared[v] <- 0.0  # More conservative than -Inf for R
-      }
-    } else {
-      r_squared[v] <- 1.0 - (rss[v] / tss[v])
-      # Clamp to [0, 1] to handle numerical issues
-      r_squared[v] <- max(0, min(1, r_squared[v]))
-    }
-  }
+
+  # Ensure native numeric storage for the C++ kernel.
+  storage.mode(y_true) <- "double"
+  storage.mode(y_pred) <- "double"
+
+  core_metrics <- calculate_fit_metrics_cpp(
+    y_true = y_true,
+    y_pred = y_pred,
+    has_intercept = has_intercept,
+    precomputed_tss = precomputed_tss,
+    tolerance = tolerance
+  )
+
+  r_squared <- core_metrics$r_squared
+  rss <- core_metrics$rss
+  tss <- core_metrics$tss
+  mse <- core_metrics$mse
+  rmse <- core_metrics$rmse
+  mae <- core_metrics$mae
   
   # Calculate adjusted R-squared
   # Account for intercept in degrees of freedom if present
@@ -120,11 +105,6 @@
   } else {
     r_squared_adj <- 1 - (1 - r_squared) * (n_obs - 1) / adj_r2_denom
   }
-  
-  # Calculate other metrics
-  mse <- rss / n_obs
-  rmse <- sqrt(mse)
-  mae <- colMeans(abs(residuals))
   
   # Return comprehensive metrics
   list(
@@ -156,7 +136,7 @@
   metrics <- .calculate_fit_metrics(
     y_true = Y,
     y_pred = Y_pred,
-    n_predictors = 0,  # Not used for basic R² calculation
+    n_predictors = 0,  # Not used for basic R^2 calculation
     has_intercept = has_intercept
   )
   metrics$r_squared
