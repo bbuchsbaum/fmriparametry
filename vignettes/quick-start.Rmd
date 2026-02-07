@@ -50,7 +50,7 @@ event_matrix <- matrix(events, ncol = 1)
 fit <- estimate_parametric_hrf(
   fmri_data = bold_data,
   event_model = event_matrix,
-  parametric_hrf = "lwu"
+  parametric_model = "lwu"
 )
 
 # View results
@@ -60,6 +60,24 @@ summary(fit)
 # Extract parameters
 params <- coef(fit)
 head(params)
+```
+
+### Reusing Precomputed Design Inputs
+
+For repeated model runs on the same projected data/design, use the design-first
+interface:
+
+```{r design-interface}
+design <- create_parametric_design(
+  fmri_data = bold_data,
+  event_model = event_matrix
+)
+
+fit2 <- estimate_parametric_hrf_from_design(
+  design = design,
+  global_refinement = FALSE,
+  compute_se = FALSE
+)
 ```
 
 ### What You Get
@@ -103,7 +121,7 @@ event_model <- event_model(
 fit <- estimate_parametric_hrf(
   fmri_data = fmri_data,
   event_model = event_model,
-  parametric_hrf = "lwu",
+  parametric_model = "lwu",
   verbose = TRUE
 )
 ```

@@ -34,9 +34,16 @@ events <- matrix(0, nrow = 20, ncol = 1)
 events[c(5, 15), 1] <- 1
 
 # Estimate HRF parameters
-fit <- estimate_parametric_hrf(fmri_data, events, parametric_hrf = "lwu",
+fit <- estimate_parametric_hrf(fmri_data, events, parametric_model = "lwu",
                                verbose = FALSE)
 summary(fit)
+```
+
+```{r}
+# Design-first workflow (useful for repeated fits)
+design <- create_parametric_design(fmri_data, events)
+fit_design <- estimate_parametric_hrf_from_design(design = design, verbose = FALSE)
+summary(fit_design)
 ```
 
 ## Diagnostic plot

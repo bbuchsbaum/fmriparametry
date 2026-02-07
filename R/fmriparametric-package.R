@@ -10,6 +10,8 @@
 #' The package provides the following main functions:
 #' \itemize{
 #'   \item \code{\link{estimate_parametric_hrf}}: Main function for parametric HRF estimation
+#'   \item \code{\link{create_parametric_design}}: Build reusable projected design inputs
+#'   \item \code{\link{estimate_parametric_hrf_from_design}}: Fit using precomputed design inputs
 #'   \item \code{\link{coef.parametric_hrf_fit}}: Extract parameter estimates
 #'   \item \code{\link{summary.parametric_hrf_fit}}: Summarize fit results
 #'   \item \code{\link{print.parametric_hrf_fit}}: Print fit summary

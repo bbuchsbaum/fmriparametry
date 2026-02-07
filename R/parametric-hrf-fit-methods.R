@@ -8,6 +8,7 @@
 #' @name parametric_hrf_fit-methods
 NULL
 
+
 #' Print a parametric_hrf_fit object
 #'
 #' Displays a comprehensive summary including refinement information,
@@ -30,13 +31,14 @@ NULL
 print.parametric_hrf_fit <- function(x, ...) {
   cat("Parametric HRF Fit\n")
   cat("==================\n")
-  cat("Model:", x$hrf_model, "\n")
-  cat("Voxels:", nrow(x$estimated_parameters), "\n")
+  cat("Model:", x$parametric_model, "\n")
+  cat("Voxels:", nrow(get_parameters(x)), "\n")
 
   # Basic parameter summary
   cat("\nParameter Summary:\n")
-  param_means <- colMeans(x$estimated_parameters, na.rm = TRUE)
-  param_sds <- apply(x$estimated_parameters, 2, sd, na.rm = TRUE)
+  params <- get_parameters(x)
+  param_means <- colMeans(params, na.rm = TRUE)
+  param_sds <- apply(params, 2, sd, na.rm = TRUE)
   param_summary <- data.frame(
     Parameter = x$parameter_names,
     Mean = round(param_means, 3),
@@ -45,196 +47,206 @@ print.parametric_hrf_fit <- function(x, ...) {
   print(param_summary, row.names = FALSE)
 
   if (!is.null(x$r_squared)) {
-    cat("\nModel Fit (R²):\n")
+    cat("\nModel Fit (R^2):\n")
     r2_summary <- summary(x$r_squared)
     cat("  Min:", round(r2_summary[1], 3), "\n")
     cat("  Median:", round(r2_summary[3], 3), "\n")
     cat("  Mean:", round(mean(x$r_squared, na.rm = TRUE), 3), "\n")
     cat("  Max:", round(r2_summary[6], 3), "\n")
-    cat("  % R² > 0.5:", round(100 * mean(x$r_squared > 0.5, na.rm = TRUE), 1), "%\n")
   }
-
-  if (!is.null(x$metadata$refinement_info) && x$metadata$refinement_info$applied) {
-    cat("\nRefinement Applied:\n")
-    ref_info <- x$metadata$refinement_info
-    cat("  Moderate voxels refined:", ref_info$n_moderate_refined, "\n")
-    cat("  Hard voxels refined:", ref_info$n_hard_refined, "\n")
-    if (ref_info$n_hard_refined > 0) {
-      cat("  Gauss-Newton converged:", ref_info$n_converged,
-          "(", round(100 * ref_info$n_converged / ref_info$n_hard_refined, 1), "%)\n")
-      cat("  Improved after refinement:", ref_info$n_improved,
-          "(", round(100 * ref_info$n_improved / ref_info$n_hard_refined, 1), "%)\n")
-    }
-  }
-
+  
   if (!is.null(x$convergence_info)) {
     cat("\nConvergence:\n")
-    cat("  Global iterations:", x$convergence_info$global_iterations, "\n")
+    cat("  Iterations:", x$convergence_info$iterations, "\n")
     if (!is.null(x$convergence_info$converged)) {
-      cat("  Converged:", ifelse(x$convergence_info$converged, "Yes", "No"), "\n")
+      cat("  Converged:", x$convergence_info$converged, "\n")
     }
-    if (!is.null(x$metadata$kmeans_info) && x$metadata$kmeans_info$applied) {
-      cat("  K-means clusters:", x$metadata$kmeans_info$n_clusters, "\n")
-      cat("  K-means iterations:", x$metadata$kmeans_info$total_iterations, "\n")
-    }
-    if (!is.null(x$convergence_info$gauss_newton)) {
-      gn <- x$convergence_info$gauss_newton
-      cat("  Gauss-Newton mean iterations:", round(gn$mean_iterations, 1), "\n")
-      cat("  Hard voxels converged:", gn$n_converged, "/", gn$n_hard, "\n")
+    if (!is.null(x$convergence_info$final_change)) {
+      cat("  Final parameter change:", 
+          format(x$convergence_info$final_change, scientific = TRUE, digits = 3), 
+          "\n")
     }
   }
-
-  if (!is.null(x$metadata$parallel_info)) {
-    cat("\nParallel Processing:\n")
-    cat("  Backend:", x$metadata$parallel_info$backend, "\n")
-    cat("  Cores used:", x$metadata$parallel_info$n_cores, "\n")
+  
+  # Sprint 3: Refinement information
+  if (!is.null(x$refinement_info) && !is.null(x$refinement_info$applied) && x$refinement_info$applied) {
+    cat("\nRefinement Applied:\n")
+    if (!is.null(x$refinement_info$voxels_refined)) {
+      cat("  Voxels refined:", x$refinement_info$voxels_refined, "\n")
+      
+      if (!is.null(x$refinement_info$r2_improvement)) {
+        cat("  Mean R^2 improvement:", 
+            round(x$refinement_info$r2_improvement, 4), "\n")
+      }
+    }
+    if (!is.null(x$refinement_info$strategy)) {
+      cat("  Strategy:", x$refinement_info$strategy, "\n")
+    }
+    if (!is.null(x$refinement_info$duration)) {
+      cat("  Refinement time:", 
+          round(x$refinement_info$duration, 2), "seconds\n")
+    }
   }
-
+  
   invisible(x)
 }
 
 #' Summarize a parametric_hrf_fit object
 #'
-#' Produces comprehensive summary statistics including refinement
-#' diagnostics and queue information.
+#' Provides detailed statistical summaries of the fitted HRF parameters and
+#' model quality metrics. The Sprint 3 implementation includes refinement
+#' statistics and stage-wise timing information.
 #'
 #' @param object A `parametric_hrf_fit` object
-#' @param ... Additional arguments
-#' @return A list with class `summary.parametric_hrf_fit`
+#' @param ... Additional arguments (ignored)
+#' @return An object of class `summary_parametric_hrf_fit` containing:
+#'   - `parameter_summary`: Summary statistics for each HRF parameter
+#'   - `amplitude_summary`: Summary of response amplitudes
+#'   - `r_squared_summary`: Distribution of R-squared values
+#'   - `convergence_summary`: Convergence diagnostics
+#'   - `refinement_summary`: Refinement statistics (if applied)
+#'   - `performance_summary`: Computational performance metrics
 #' @export
 #' @examples
 #' \dontrun{
-#' # Create a summary of the fit
-#' fit_summary <- summary(fit)
-#' print(fit_summary)
-#' 
-#' # Access summary components
-#' fit_summary$parameter_summary  # Statistics for each parameter
-#' fit_summary$r_squared_summary  # R-squared distribution
+#' s <- summary(fit)
+#' print(s)
 #' }
 summary.parametric_hrf_fit <- function(object, ...) {
-  param_sum <- apply(object$estimated_parameters, 2, summary)
-  amp_sum <- summary(object$amplitudes)
-
-  r2_sum <- if (!is.null(object$r_squared)) {
-    list(
-      summary = summary(object$r_squared),
-      prop_good = mean(object$r_squared > 0.5, na.rm = TRUE),
-      prop_excellent = mean(object$r_squared > 0.7, na.rm = TRUE),
-      n_failed = sum(object$r_squared < 0.1, na.rm = TRUE)
-    )
-  } else NULL
-
-  se_sum <- if (!is.null(object$parameter_ses)) {
-    apply(object$parameter_ses, 2, function(x) summary(x[is.finite(x)]))
-  } else NULL
-
-  refinement_sum <- if (!is.null(object$metadata$refinement_info) &&
-                          object$metadata$refinement_info$applied) {
-    ref_info <- object$metadata$refinement_info
-    queue_sum <- ref_info$final_queue_summary
-    list(
-      applied = TRUE,
-      queue_summary = queue_sum,
-      queue_proportions = prop.table(queue_sum),
-      n_moderate_refined = ref_info$n_moderate_refined,
-      n_hard_refined = ref_info$n_hard_refined,
-      n_converged = ref_info$n_converged,
-      n_improved = ref_info$n_improved,
-      improvement_rate = if (ref_info$n_hard_refined > 0) {
-        ref_info$n_improved / ref_info$n_hard_refined
-      } else NA
-    )
-  } else {
-    list(applied = FALSE)
-  }
-
-  structure(
-    list(
-      parameter_summary = param_sum,
-      amplitude_summary = amp_sum,
-      r_squared_summary = r2_sum,
-      se_summary = se_sum,
-      refinement_summary = refinement_sum,
-      hrf_model = object$hrf_model,
-      n_voxels = nrow(object$estimated_parameters),
-      n_timepoints = object$metadata$n_timepoints,
-      computation_time = object$metadata$computation_time,
-      parallel_info = object$metadata$parallel_info
-    ),
-    class = "summary_parametric_hrf_fit"
+  # Get parameters using helper function
+  params <- get_parameters(object)
+  
+  # Parameter summary
+  parameter_summary <- data.frame(
+    Parameter = object$parameter_names,
+    Mean = colMeans(params, na.rm = TRUE),
+    SD = apply(params, 2, sd, na.rm = TRUE),
+    Min = apply(params, 2, min, na.rm = TRUE),
+    Max = apply(params, 2, max, na.rm = TRUE)
   )
+  
+  # Amplitude summary
+  amplitude_summary <- NULL
+  if (!is.null(object$amplitudes)) {
+    amplitude_summary <- summary(object$amplitudes)
+  }
+  
+  # R-squared summary
+  r_squared_summary <- NULL
+  if (!is.null(object$r_squared)) {
+    r_squared_summary <- summary(object$r_squared)
+  }
+  
+  # Convergence summary
+  convergence_summary <- object$convergence_info
+  
+  # Sprint 3: Refinement summary
+  refinement_summary <- NULL
+  if (!is.null(object$refinement_info) && !is.null(object$refinement_info$applied) && object$refinement_info$applied) {
+    refinement_summary <- object$refinement_info
+    
+    # Add classification breakdown if available
+    if (!is.null(object$metadata$voxel_classification)) {
+      refinement_summary$classification <- table(object$metadata$voxel_classification)
+    }
+  }
+  
+  # Performance summary
+  performance_summary <- NULL
+  if (!is.null(object$metadata$computational_details)) {
+    comp_details <- object$metadata$computational_details
+    performance_summary <- list(
+      total_time = comp_details$total_duration,
+      parallel = comp_details$parallel_used,
+      n_cores = comp_details$n_cores
+    )
+    
+    # Add stage timings if available
+    if (!is.null(comp_details$stage_timings)) {
+      performance_summary$stage_timings <- comp_details$stage_timings
+    }
+  }
+  
+  result <- list(
+    parameter_summary = parameter_summary,
+    amplitude_summary = amplitude_summary,
+    r_squared_summary = r_squared_summary,
+    convergence_summary = convergence_summary,
+    refinement_summary = refinement_summary,
+    performance_summary = performance_summary,
+    n_voxels = nrow(params),
+    model = object$parametric_model
+  )
+  
+  class(result) <- "summary_parametric_hrf_fit"
+  result
 }
 
 #' @export
 print.summary_parametric_hrf_fit <- function(x, ...) {
   cat("Summary of Parametric HRF Fit\n")
   cat("=============================\n")
-  cat("\nModel:", x$hrf_model, "\n")
-  cat("Voxels:", x$n_voxels, "\n")
-  cat("Timepoints:", x$n_timepoints, "\n")
-
-  cat("\nParameter Estimates:\n")
-  print(round(x$parameter_summary, 3))
-
-  cat("\nAmplitude Summary:\n")
-  print(round(x$amplitude_summary, 3))
-
+  cat("Model:", x$model, "\n")
+  cat("Voxels:", x$n_voxels, "\n\n")
+  
+  cat("Parameter Estimates:\n")
+  print(x$parameter_summary, row.names = FALSE, digits = 3)
+  
+  if (!is.null(x$amplitude_summary)) {
+    cat("\nAmplitude Summary:\n")
+    print(x$amplitude_summary)
+  }
+  
   if (!is.null(x$r_squared_summary)) {
-    cat("\nModel Fit (R²):\n")
-    print(round(x$r_squared_summary$summary, 3))
-    cat("Proportion R² > 0.5:", round(100 * x$r_squared_summary$prop_good, 1), "%\n")
-    cat("Proportion R² > 0.7:", round(100 * x$r_squared_summary$prop_excellent, 1), "%\n")
-    cat("Failed voxels (R² < 0.1):", x$r_squared_summary$n_failed, "\n")
+    cat("\nModel Fit (R^2) Summary:\n")
+    print(x$r_squared_summary)
   }
-
-  if (!is.null(x$se_summary)) {
-    cat("\nStandard Errors:\n")
-    print(round(x$se_summary, 3))
-  }
-
-  if (x$refinement_summary$applied) {
-    cat("\nRefinement Summary:\n")
-    cat("Queue distribution:\n")
-    queue_df <- data.frame(
-      Queue = names(x$refinement_summary$queue_summary),
-      Count = as.numeric(x$refinement_summary$queue_summary),
-      Proportion = round(100 * as.numeric(x$refinement_summary$queue_proportions), 1)
-    )
-    print(queue_df, row.names = FALSE)
-
-    cat("\nRefinement results:\n")
-    cat("  Moderate voxels refined:", x$refinement_summary$n_moderate_refined, "\n")
-    cat("  Hard voxels refined:", x$refinement_summary$n_hard_refined, "\n")
-    if (x$refinement_summary$n_hard_refined > 0) {
-      cat("  Gauss-Newton converged:", x$refinement_summary$n_converged, "\n")
-      cat("  Improved after refinement:", x$refinement_summary$n_improved,
-          "(", round(100 * x$refinement_summary$improvement_rate, 1), "%)\n")
+  
+  if (!is.null(x$convergence_summary)) {
+    cat("\nConvergence Information:\n")
+    cat("  Iterations:", x$convergence_summary$iterations, "\n")
+    if (!is.null(x$convergence_summary$converged)) {
+      cat("  Converged:", x$convergence_summary$converged, "\n")
     }
   }
-
-  if (!is.null(x$parallel_info)) {
-    cat("\nComputation:\n")
-    cat("  Parallel backend:", x$parallel_info$backend, "\n")
-    cat("  Cores used:", x$parallel_info$n_cores, "\n")
+  
+  if (!is.null(x$refinement_summary) && !is.null(x$refinement_summary$applied) && x$refinement_summary$applied) {
+    cat("\nRefinement Information:\n")
+    cat("  Strategy:", x$refinement_summary$strategy, "\n")
+    cat("  Voxels refined:", x$refinement_summary$voxels_refined, "\n")
+    
+    if (!is.null(x$refinement_summary$classification)) {
+      cat("\nVoxel Classification:\n")
+      print(x$refinement_summary$classification)
+    }
   }
-
-  if (!is.null(x$computation_time)) {
-    cat("  Total time:", round(x$computation_time, 1), "seconds\n")
+  
+  if (!is.null(x$performance_summary)) {
+    cat("\nPerformance:\n")
+    cat("  Total time:", round(x$performance_summary$total_time, 2), "seconds\n")
+    if (!is.null(x$performance_summary$parallel)) {
+      cat("  Parallel:", x$performance_summary$parallel, "\n")
+      if (x$performance_summary$parallel && !is.null(x$performance_summary$n_cores)) {
+        cat("  Cores used:", x$performance_summary$n_cores, "\n")
+      }
+    }
   }
-
+  
   invisible(x)
 }
 
-#' Extract coefficients from a parametric_hrf_fit
+#' Extract coefficients from a parametric_hrf_fit object
 #'
-#' Returns the matrix of estimated HRF parameters or amplitudes. Standard
-#' errors can also be retrieved when available.
+#' Returns HRF parameters, amplitudes, or standard errors depending on
+#' the requested type. Supports both v1 and v2 object structures.
 #'
 #' @param object A `parametric_hrf_fit` object
-#' @param type Character string: "parameters" (default), "amplitude" or "se"
+#' @param type Character string specifying what to extract:
+#'   - `"parameters"`: HRF parameters (default)
+#'   - `"amplitudes"`: Response amplitudes (supports alias "amplitude")
+#'   - `"se"`: Parameter standard errors
 #' @param ... Additional arguments (ignored)
-#' @return A numeric matrix or vector depending on `type`
+#' @return A matrix or vector of the requested coefficients
 #' @export
 #' @examples
 #' \dontrun{
@@ -243,26 +255,30 @@ print.summary_parametric_hrf_fit <- function(x, ...) {
 #' head(params)
 #' 
 #' # Get amplitudes
-#' amps <- coef(fit, type = "amplitude")
+#' amps <- coef(fit, type = "amplitudes")
 #' 
 #' # Get standard errors
 #' ses <- coef(fit, type = "se")
 #' }
 coef.parametric_hrf_fit <- function(object,
-                                   type = c("parameters", "amplitude", "se"),
+                                   type = c("parameters", "amplitudes", "amplitude", "se"),
                                    ...) {
   type <- match.arg(type)
+  
+  # Handle amplitude/amplitudes alias
+  if (type == "amplitude") type <- "amplitudes"
+  
   result <- switch(type,
-         parameters = object$estimated_parameters,
-         amplitude  = object$amplitudes,
-         se = {
-           if (is.null(object$parameter_ses)) {
-             warning("Standard errors not available")
-             NULL
-           } else {
-             object$parameter_ses
-           }
-         })
+    parameters = object$model_specific$parameters,
+    amplitudes = object$amplitudes,
+    se = {
+      if (is.null(object$model_specific$standard_errors)) {
+        warning("Standard errors not available")
+        NULL
+      } else {
+        object$model_specific$standard_errors
+      }
+    })
   
   # Add row names for parameters
   if (type == "parameters" && !is.null(result)) {
@@ -274,281 +290,307 @@ coef.parametric_hrf_fit <- function(object,
   result
 }
 
-#' Variance-covariance matrix for parametric_hrf_fit parameters
+#' Compute residuals from a parametric_hrf_fit object
 #'
-#' Returns the estimated variance-covariance matrix for the HRF parameters of
-#' one or more voxels. If only a single voxel index is supplied a matrix is
-#' returned; otherwise a list of matrices is produced. When full covariance
-#' information was not retained during fitting, the matrix is constructed using
-#' the available standard errors (i.e. a diagonal matrix).
+#' Returns residuals if available, otherwise computes them from fitted values.
+#' Requires the original data if residuals are not stored in the object.
 #'
 #' @param object A `parametric_hrf_fit` object
-#' @param voxel_index Integer vector of voxel indices
-#' @param ... Currently unused
-#' @return A variance-covariance matrix or list of matrices
+#' @param Y_proj Optional projected Y data. Required if residuals not stored.
+#' @param ... Additional arguments (ignored)
+#' @return Matrix of residuals (timepoints x voxels)
 #' @export
-vcov.parametric_hrf_fit <- function(object, voxel_index, ...) {
-  if (missing(voxel_index)) {
-    stop("voxel_index must be specified")
+residuals.parametric_hrf_fit <- function(object, Y_proj = NULL, ...) {
+  # Check if residuals are already computed
+  if (!is.null(object$residuals)) {
+    return(object$residuals)
   }
-  if (is.null(object$parameter_ses)) {
-    stop("Variance information not available in fit object")
+  
+  # Need Y_proj to compute residuals
+  if (is.null(Y_proj)) {
+    stop("Y_proj must be provided when residuals are not stored in the fit object")
   }
-
-  get_one_vcov <- function(v) {
-    se <- object$parameter_ses[v, ]
-    V <- diag(se^2, nrow = length(se))
-    dimnames(V) <- list(object$parameter_names, object$parameter_names)
-    V
-  }
-
-  if (length(voxel_index) == 1) {
-    get_one_vcov(voxel_index)
-  } else {
-    lapply(voxel_index, get_one_vcov)
-  }
+  
+  # Compute fitted values
+  fitted_vals <- fitted(object, Y_proj)
+  
+  # Return residuals
+  Y_proj - fitted_vals
 }
 
-#' Plot diagnostics for a parametric_hrf_fit
+#' Plot a parametric_hrf_fit object
 #'
-#' Provides multiple visualisations including HRF curves, parameter
-#' distributions, diagnostic scatter plots and refinement summaries.
+#' Create various visualizations of the HRF fit results including individual
+#' HRF curves, parameter distributions, and model quality metrics.
 #'
 #' @param x A `parametric_hrf_fit` object
-#' @param type Plot type: "hrf", "parameters", "diagnostic" or "refinement"
-#' @param voxels Optional vector of voxel indices for HRF plots
-#' @param ... Additional arguments passed to plotting functions
-#' @return A ggplot object or list of plots depending on `type`
+#' @param type Character string specifying plot type:
+#'   - `"hrf"`: Plot HRF curves (default)
+#'   - `"parameters"`: Parameter distribution plots
+#'   - `"quality"`: Model quality metrics (R-squared distribution)
+#'   - `"refinement"`: Refinement diagnostics (if applicable)
+#' @param voxel_indices Integer vector of voxel indices to plot (for type="hrf")
+#' @param n_voxels Number of random voxels to plot if voxel_indices not specified
+#' @param add_mean Logical, whether to add mean HRF curve
+#' @param ... Additional graphical parameters
+#' @return The input object invisibly
 #' @export
-#' @examples
-#' \dontrun{
-#' # Plot HRFs for voxels at different R² quantiles
-#' plot(fit, type = "hrf", n_curves = 5)
-#' 
-#' # Plot parameter distributions
-#' plot(fit, type = "parameters")
-#' 
-#' # Create diagnostic plots
-#' plot(fit, type = "diagnostic")
-#' 
-#' # Plot specific voxels
-#' plot(fit, type = "hrf", voxels = c(1, 10, 100))
-#' }
 plot.parametric_hrf_fit <- function(x,
-                                    type = c("hrf", "parameters", "diagnostic", "refinement"),
-                                    voxels = NULL,
+                                    type = c("hrf", "parameters", "quality", "refinement"),
+                                    voxel_indices = NULL,
+                                    n_voxels = 10,
+                                    add_mean = TRUE,
                                     ...) {
   type <- match.arg(type)
-
-  if (!requireNamespace("ggplot2", quietly = TRUE)) {
-    stop("Package 'ggplot2' is required for plotting")
-  }
-
+  
   switch(type,
-         hrf = .plot_hrf(x, voxels, ...),
+         hrf = .plot_hrf(x, voxel_indices, n_voxels, add_mean, ...),
          parameters = .plot_parameters(x, ...),
-         diagnostic = .plot_diagnostic(x, ...),
-         refinement = .plot_refinement(x, ...))
+         quality = .plot_quality(x, ...),
+         refinement = .plot_refinement(x, ...)
+  )
+  
+  invisible(x)
 }
 
-#' @keywords internal
-.plot_hrf <- function(x, voxels = NULL, n_curves = 10, ...) {
-  if (is.null(voxels)) {
-    r2_quantiles <- quantile(x$r_squared, probs = seq(0.1, 0.9, length.out = n_curves))
-    voxels <- sapply(r2_quantiles, function(q) which.min(abs(x$r_squared - q))[1])
+# Helper function to plot HRF curves
+.plot_hrf <- function(x, voxel_indices = NULL, n_voxels = 10, add_mean = TRUE, ...) {
+  # Use pre-computed HRF shapes if available
+  if (!is.null(x$hrf_shape)) {
+    .plot_hrf_shape(x$hrf_shape, x$metadata$hrf_eval_times, 
+                    voxel_indices, n_voxels, add_mean, ...)
+  } else {
+    # Compute HRF curves on the fly if not pre-computed
+    .plot_hrf_compute(x, voxel_indices, n_voxels, add_mean, ...)
   }
+}
 
-  t_hrf <- seq(0, 30, by = 0.1)
-  hrf_curves <- matrix(NA, nrow = length(t_hrf), ncol = length(voxels))
-
-  if (x$hrf_model == "lwu") {
-    bounds <- .lwu_hrf_default_bounds()
-    hrf_fn <- function(t, params) .lwu_hrf_function(t, params, bounds)
+# Plot pre-computed HRF shapes
+.plot_hrf_shape <- function(hrf_shape, times, voxel_indices = NULL, 
+                           n_voxels = 10, add_mean = TRUE, ...) {
+  # Check if hrf_shape is valid
+  if (is.null(hrf_shape) || !is.matrix(hrf_shape) || ncol(hrf_shape) == 0) {
+    warning("No HRF shapes available to plot")
+    return(invisible(NULL))
   }
-
-  for (i in seq_along(voxels)) {
-    v <- voxels[i]
-    theta <- x$estimated_parameters[v, ]
-    
-    # Ensure parameters are within valid bounds for HRF evaluation
-    if (x$hrf_model == "lwu") {
-      # Enforce minimum sigma value - must be strictly > 0.05 for fmrireg
-      theta[2] <- max(theta[2], 0.051)
+  
+  # Check if times is valid
+  if (is.null(times) || length(times) == 0) {
+    warning("No time points available to plot")
+    return(invisible(NULL))
+  }
+  
+  n_total <- ncol(hrf_shape)
+  
+  if (is.null(voxel_indices)) {
+    if (n_voxels >= n_total) {
+      voxel_indices <- seq_len(n_total)
+    } else {
+      voxel_indices <- sample(n_total, n_voxels)
     }
-    
-    hrf_curves[, i] <- x$amplitudes[v] * hrf_fn(t_hrf, theta)
   }
-
-  plot_data <- data.frame(
-    time = rep(t_hrf, length(voxels)),
-    hrf = as.vector(hrf_curves),
-    voxel = factor(rep(voxels, each = length(t_hrf))),
-    r2 = rep(x$r_squared[voxels], each = length(t_hrf))
-  )
-
-  ggplot2::ggplot(plot_data, ggplot2::aes(x = time, y = hrf,
-                                          color = r2, group = voxel)) +
-    ggplot2::geom_line(alpha = 0.7) +
-    ggplot2::scale_color_viridis_c(name = expression(R^2)) +
-    ggplot2::labs(title = "Estimated HRF Curves",
-                  x = "Time (seconds)", y = "Response") +
-    ggplot2::theme_minimal()
+  
+  # Setup plot
+  y_range <- range(hrf_shape[, voxel_indices], na.rm = TRUE)
+  plot(times, hrf_shape[, voxel_indices[1]], type = "l",
+       ylim = y_range, col = "gray70",
+       xlab = "Time (s)", ylab = "HRF Amplitude",
+       main = "Hemodynamic Response Functions", ...)
+  
+  # Add other voxels
+  if (length(voxel_indices) > 1) {
+    for (i in 2:length(voxel_indices)) {
+      lines(times, hrf_shape[, voxel_indices[i]], col = "gray70")
+    }
+  }
+  
+  # Add mean curve
+  if (add_mean) {
+    mean_hrf <- rowMeans(hrf_shape, na.rm = TRUE)
+    lines(times, mean_hrf, col = "red", lwd = 2)
+    legend("topright", c("Individual", "Mean"), 
+           col = c("gray70", "red"), lwd = c(1, 2))
+  }
 }
 
-#' @keywords internal
+# Compute HRF curves on the fly
+.plot_hrf_compute <- function(x, voxel_indices = NULL, n_voxels = 10, 
+                            add_mean = TRUE, ...) {
+  params <- get_parameters(x)
+  n_total <- nrow(params)
+  
+  if (is.null(voxel_indices)) {
+    if (n_voxels >= n_total) {
+      voxel_indices <- seq_len(n_total)
+    } else {
+      voxel_indices <- sample(n_total, n_voxels)
+    }
+  }
+  
+  # Get HRF interface
+  hrf_interface <- .create_hrf_interface(x$parametric_model)
+  times <- x$metadata$hrf_eval_times
+  if (is.null(times)) {
+    times <- seq(0, 30, length.out = 61)
+  }
+  
+  # Compute HRF for selected voxels
+  hrf_curves <- matrix(NA, length(times), length(voxel_indices))
+  for (i in seq_along(voxel_indices)) {
+    v <- voxel_indices[i]
+    theta_v <- params[v, ]
+    hrf_curves[, i] <- hrf_interface$hrf_function(times, theta_v)
+  }
+  
+  # Plot
+  y_range <- range(hrf_curves, na.rm = TRUE)
+  plot(times, hrf_curves[, 1], type = "l", ylim = y_range, col = "gray70",
+       xlab = "Time (s)", ylab = "HRF Amplitude",
+       main = "Hemodynamic Response Functions", ...)
+  
+  if (ncol(hrf_curves) > 1) {
+    for (i in 2:ncol(hrf_curves)) {
+      lines(times, hrf_curves[, i], col = "gray70")
+    }
+  }
+  
+  if (add_mean) {
+    mean_params <- colMeans(params, na.rm = TRUE)
+    mean_hrf <- hrf_interface$hrf_function(times, mean_params)
+    lines(times, mean_hrf, col = "red", lwd = 2)
+    legend("topright", c("Individual", "Mean"), 
+           col = c("gray70", "red"), lwd = c(1, 2))
+  }
+}
+
+# Helper function to plot parameter distributions
 .plot_parameters <- function(x, ...) {
-  param_data <- as.data.frame(x$estimated_parameters)
-  colnames(param_data) <- x$parameter_names
-  param_data$r2 <- x$r_squared
-
-  param_long <- reshape(param_data,
-                        direction = "long",
-                        varying = x$parameter_names,
-                        v.names = "value",
-                        timevar = "parameter",
-                        times = x$parameter_names)
-
-  ggplot2::ggplot(param_long, ggplot2::aes(x = value, fill = parameter)) +
-    ggplot2::geom_histogram(bins = 30, alpha = 0.7) +
-    ggplot2::facet_wrap(~ parameter, scales = "free") +
-    ggplot2::labs(title = "Parameter Distributions",
-                  x = "Parameter Value", y = "Count") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(legend.position = "none")
+  params <- get_parameters(x)
+  n_params <- ncol(params)
+  
+  # Setup multi-panel plot
+  old_par <- par(mfrow = c(1, n_params), mar = c(4, 4, 2, 1))
+  on.exit(par(old_par))
+  
+  for (i in seq_len(n_params)) {
+    hist(params[, i], 
+         main = x$parameter_names[i],
+         xlab = x$parameter_names[i],
+         col = "lightblue", ...)
+    
+    # Add mean line
+    abline(v = mean(params[, i], na.rm = TRUE), 
+           col = "red", lwd = 2, lty = 2)
+  }
 }
 
-#' @keywords internal
-.plot_diagnostic <- function(x, ...) {
+# Helper function to plot model quality metrics
+.plot_quality <- function(x, ...) {
   if (is.null(x$r_squared)) {
-    stop("No R-squared values available for diagnostic plot")
+    warning("No R-squared values available")
+    return(invisible(NULL))
   }
-
-  diag_data <- data.frame(
-    voxel = seq_len(nrow(x$estimated_parameters)),
-    r2 = x$r_squared,
-    amplitude = x$amplitudes
-  )
-  for (i in seq_along(x$parameter_names)) {
-    diag_data[[x$parameter_names[i]]] <- x$estimated_parameters[, i]
-  }
-
-  p1 <- ggplot2::ggplot(diag_data, ggplot2::aes(x = r2)) +
-    ggplot2::geom_histogram(bins = 50, fill = "steelblue", alpha = 0.7) +
-    ggplot2::geom_vline(xintercept = c(0.3, 0.5, 0.7),
-                        linetype = "dashed", alpha = 0.5) +
-    ggplot2::labs(title = "R² Distribution", x = expression(R^2), y = "Count") +
-    ggplot2::theme_minimal()
-
-  param_plots <- list()
-  for (param in x$parameter_names) {
-    param_plots[[param]] <- ggplot2::ggplot(diag_data,
-                                            ggplot2::aes_string(x = param, y = "r2")) +
-      ggplot2::geom_point(alpha = 0.3, size = 0.5) +
-      ggplot2::geom_smooth(method = "loess", se = FALSE, color = "red") +
-      ggplot2::labs(title = paste(param, "vs R²"), x = param, y = expression(R^2)) +
-      ggplot2::theme_minimal()
-  }
-
-  if (requireNamespace("gridExtra", quietly = TRUE)) {
-    gridExtra::grid.arrange(p1, grobs = param_plots, ncol = 2)
-  } else {
-    p1
-  }
+  
+  # R-squared histogram
+  hist(x$r_squared, 
+       main = "Model Fit Quality (R^2)",
+       xlab = "R-squared",
+       col = "lightgreen",
+       breaks = 30, ...)
+  
+  # Add summary lines
+  abline(v = mean(x$r_squared, na.rm = TRUE), col = "red", lwd = 2, lty = 1)
+  abline(v = median(x$r_squared, na.rm = TRUE), col = "blue", lwd = 2, lty = 2)
+  
+  legend("topleft", 
+         c(paste("Mean:", round(mean(x$r_squared, na.rm = TRUE), 3)),
+           paste("Median:", round(median(x$r_squared, na.rm = TRUE), 3))),
+         col = c("red", "blue"), lty = c(1, 2), lwd = 2)
 }
 
-#' @keywords internal
+# Helper function to plot refinement diagnostics
 .plot_refinement <- function(x, ...) {
-  if (is.null(x$metadata$refinement_info) || !x$metadata$refinement_info$applied) {
-    stop("No refinement information available")
+  if (is.null(x$refinement_info) || is.null(x$refinement_info$applied) || !x$refinement_info$applied) {
+    warning("No refinement information available")
+    return(invisible(NULL))
   }
-
-  ref_info <- x$metadata$refinement_info
-  queue_result <- ref_info$queue_result
-
-  ref_data <- data.frame(
-    voxel = seq_len(nrow(x$estimated_parameters)),
-    r2_initial = x$r_squared,
-    queue = queue_result$queue_labels
-  )
-
-  queue_summary <- as.data.frame(table(ref_data$queue))
-  colnames(queue_summary) <- c("Queue", "Count")
-
-  p1 <- ggplot2::ggplot(queue_summary, ggplot2::aes(x = "", y = Count, fill = Queue)) +
-    ggplot2::geom_bar(stat = "identity", width = 1) +
-    ggplot2::coord_polar("y", start = 0) +
-    ggplot2::labs(title = "Refinement Queue Distribution") +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(axis.title = ggplot2::element_blank(),
-                   axis.text = ggplot2::element_blank())
-
-  p2 <- ggplot2::ggplot(ref_data, ggplot2::aes(x = queue, y = r2_initial, fill = queue)) +
-    ggplot2::geom_boxplot(alpha = 0.7) +
-    ggplot2::labs(title = "R² by Refinement Queue", x = "Queue", y = expression(R^2)) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(legend.position = "none")
-
-  if (requireNamespace("gridExtra", quietly = TRUE)) {
-    gridExtra::grid.arrange(p1, p2, ncol = 2)
-  } else {
-    p1
+  
+  # Check for before/after R-squared
+  if (!is.null(x$refinement_info$r2_before) && 
+      !is.null(x$refinement_info$r2_after)) {
+    
+    # Create before/after comparison
+    r2_change <- x$refinement_info$r2_after - x$refinement_info$r2_before
+    
+    # Plot improvement
+    hist(r2_change[r2_change != 0], 
+         main = "R^2 Improvement from Refinement",
+         xlab = "Change in R^2",
+         col = "lightcoral", ...)
+    
+    abline(v = 0, col = "gray", lwd = 2, lty = 2)
+    abline(v = mean(r2_change[r2_change != 0], na.rm = TRUE), 
+           col = "red", lwd = 2)
+    
+    # Add summary
+    improved <- sum(r2_change > 0, na.rm = TRUE)
+    total_refined <- sum(r2_change != 0, na.rm = TRUE)
+    
+    legend("topright", 
+           c(paste("Improved:", improved, "/", total_refined),
+             paste("Mean improvement:", 
+                   round(mean(r2_change[r2_change > 0], na.rm = TRUE), 4))),
+           bty = "n")
   }
 }
 
-#' Extract residuals from a parametric_hrf_fit
-#'
-#' @param object A `parametric_hrf_fit` object
+#' Get fitted values from parametric_hrf_fit
+#' @param object parametric_hrf_fit object  
+#' @param Y_proj Original projected Y data (required if residuals not stored)
 #' @param ... Additional arguments (ignored)
-#' @return Numeric matrix of residuals or NULL
-#' @export
-#' @examples
-#' \dontrun{
-#' # Get residuals from the fit
-#' resids <- residuals(fit)
-#' 
-#' # Check residual properties
-#' hist(resids[, 1])  # Histogram for first voxel
-#' qqnorm(resids[, 1])  # Q-Q plot
-#' }
-residuals.parametric_hrf_fit <- function(object, ...) {
-  if (is.null(object$residuals)) {
-    warning("No residuals stored in the fit object")
-    return(NULL)
-  }
-  object$residuals
-}
-
-#' Extract fitted values from a parametric_hrf_fit
-#'
-#' If fitted values were stored they are returned directly.  Otherwise the
-#' original data must be supplied via `Y_proj` so that fitted values can be
-#' reconstructed from the residuals.
-#'
-#' @param object A `parametric_hrf_fit` object
-#' @param Y_proj Optional original projected data used during fitting
-#' @param ... Additional arguments (ignored)
-#' @return Numeric matrix of fitted values or NULL
+#' @return Matrix of fitted values
 #' @export
 fitted.parametric_hrf_fit <- function(object, Y_proj = NULL, ...) {
-  if (!is.null(object$fitted_values)) {
-    return(object$fitted_values)
-  }
-  if (!is.null(object$residuals)) {
-    if (is.null(Y_proj)) {
-      stop("Y_proj required to compute fitted values from residuals")
-    }
+  # Implementation depends on whether residuals are stored
+  if (!is.null(object$residuals) && !is.null(Y_proj)) {
     return(Y_proj - object$residuals)
   }
-  warning("Cannot compute fitted values without residuals")
-  NULL
+  
+  # Otherwise need Y_proj to compute fitted values
+  if (is.null(Y_proj)) {
+    stop("Y_proj required")
+  }
+  
+  # Need design matrix to recompute
+  if (is.null(object$metadata$S_target_proj)) {
+    stop("Cannot compute fitted values without design matrix")
+  }
+  
+  params <- get_parameters(object)
+  amplitudes <- object$amplitudes
+  S <- object$metadata$S_target_proj
+  times <- object$metadata$hrf_eval_times
+  
+  # Get HRF interface
+  hrf_interface <- .create_hrf_interface(object$parametric_model)
+  
+  # Compute fitted values for each voxel
+  n_time <- nrow(S)
+  n_vox <- nrow(params)
+  fitted_vals <- matrix(0, n_time, n_vox)
+  
+  for (v in seq_len(n_vox)) {
+    hrf_v <- hrf_interface$hrf_function(times, params[v,])
+    conv_v <- .batch_convolution(S, matrix(hrf_v, ncol = 1), n_time)
+    fitted_vals[, v] <- amplitudes[v] * conv_v[, 1]
+  }
+  
+  fitted_vals
 }
 
-#' Predict BOLD responses from a parametric_hrf_fit
+#' Predict method for parametric_hrf_fit
 #'
-#' Generates predicted time series using the estimated HRF parameters and
-#' stimulus design. When `newdata` is `NULL` the function attempts to use the
-#' original design matrix stored in the fit object's metadata.  Predictions are
-#' returned for the selected voxels.
+#' Generate predictions for new stimulus designs using fitted HRF parameters.
 #'
 #' @param object A `parametric_hrf_fit` object
 #' @param newdata Optional stimulus design matrix in projected space
@@ -563,8 +605,10 @@ predict.parametric_hrf_fit <- function(object,
                                        newdata = NULL,
                                        voxel_indices = NULL,
                                        ...) {
+  params <- get_parameters(object)
+  
   if (is.null(voxel_indices)) {
-    voxel_indices <- seq_len(nrow(object$estimated_parameters))
+    voxel_indices <- seq_len(nrow(params))
   }
 
   if (is.null(newdata)) {
@@ -583,19 +627,93 @@ predict.parametric_hrf_fit <- function(object,
     hrf_eval_times <- seq(0, 30, length.out = 61)
   }
 
-  hrf_interface <- .get_hrf_interface(object$hrf_model)
-  bounds <- hrf_interface$default_bounds()
+  # Use factory instead of registry
+  hrf_interface <- .create_hrf_interface(object$parametric_model, 
+                                        user_bounds = object$metadata$theta_bounds)
+  
   n_time <- nrow(newdata)
   result <- matrix(NA_real_, nrow = n_time, ncol = length(voxel_indices))
 
   for (i in seq_along(voxel_indices)) {
     v <- voxel_indices[i]
-    theta_v <- object$estimated_parameters[v, ]
+    theta_v <- params[v, ]
     beta0_v <- object$amplitudes[v]
-    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v, bounds = bounds)
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
     conv <- .batch_convolution(newdata, matrix(hrf_vals, ncol = 1), n_time)
     result[, i] <- beta0_v * conv[, 1]
   }
 
   result
+}
+
+#' Get parameters from parametric_hrf_fit
+#' 
+#' @param fit A parametric_hrf_fit object
+#' @return Matrix of estimated parameters
+#' @export
+get_parameters <- function(fit) {
+  fit$model_specific$parameters
+}
+
+#' Get parameter standard errors from parametric_hrf_fit
+#' 
+#' @param fit A parametric_hrf_fit object
+#' @return Matrix of parameter standard errors
+#' @export
+get_parameter_ses <- function(fit) {
+  fit$model_specific$standard_errors
+}
+
+#' Get model name from parametric_hrf_fit
+#' 
+#' @param fit A parametric_hrf_fit object
+#' @return Character string of model name
+#' @export
+get_model_name <- function(fit) {
+  fit$parametric_model
+}
+
+#' Get design metadata from parametric_hrf_fit
+#'
+#' Returns normalized design information aligned with other fit-object based
+#' modeling packages.
+#'
+#' @param fit A parametric_hrf_fit object.
+#' @return A named list with `n_time`, `n_vox`, `n_cond`, `basis_dim`, and
+#'   `projected`.
+#' @export
+get_design_info <- function(fit) {
+  info <- fit$metadata$design_info
+  if (is.null(info)) {
+    info <- list(
+      n_time = fit$metadata$n_timepoints,
+      n_vox = fit$metadata$n_voxels,
+      n_cond = NA_integer_,
+      basis_dim = ncol(get_parameters(fit)),
+      projected = NA
+    )
+  }
+  info
+}
+
+#' Get per-voxel goodness-of-fit from parametric_hrf_fit
+#'
+#' @param fit A parametric_hrf_fit object.
+#' @return Numeric vector of per-voxel goodness-of-fit (`R^2`).
+#' @export
+get_gof_per_voxel <- function(fit) {
+  fit$r_squared
+}
+
+#' Get estimation method label from parametric_hrf_fit
+#'
+#' @param fit A parametric_hrf_fit object.
+#' @return Character scalar with method label.
+#' @export
+get_method_used <- function(fit) {
+  method <- fit$metadata$method_used
+  if (is.null(method) || !is.character(method) || length(method) != 1) {
+    return("parametric_taylor")
+  }
+  method
 }

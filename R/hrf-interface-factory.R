@@ -17,15 +17,11 @@
     # If user provided bounds, validate and merge with defaults
     if (!is.null(user_bounds)) {
       # Validate user bounds
-      .validate_theta_bounds(user_bounds, n_params = 3)
+      .validate_theta_bounds(user_bounds, n_params = 3,
+                           param_names = c("tau", "sigma", "rho"))
       
-      # Use user bounds but ensure sigma >= 0.051 for numerical stability
-      final_bounds <- user_bounds
-      if (final_bounds$lower[2] < 0.051) {
-        warning("Adjusting sigma lower bound from ", final_bounds$lower[2], 
-                " to 0.051 for numerical stability", call. = FALSE)
-        final_bounds$lower[2] <- 0.051
-      }
+      # Adjust bounds for numerical stability
+      final_bounds <- .adjust_bounds_for_stability(user_bounds, model = "lwu", warn = TRUE)
     } else {
       final_bounds <- default_bounds
     }
@@ -37,15 +33,17 @@
         .lwu_hrf_function(t, params_vector, bounds = final_bounds, ...)
       },
       taylor_basis = function(params_vector0, t_hrf_eval, ...) {
-        # This function also uses the `final_bounds`
-        .lwu_hrf_taylor_basis_function(params_vector0, t_hrf_eval, bounds = final_bounds, ...)
+        # Engine fast path (C++ finite-difference kernels).
+        .lwu_hrf_taylor_basis_fast(params_vector0, t_hrf_eval, bounds = final_bounds, ...)
       },
       parameter_names = .lwu_hrf_parameter_names(),
-      default_seed = .lwu_hrf_default_seed(),
-      default_bounds = default_bounds, # Keep defaults for reference
+      default_seed = .lwu_hrf_default_seed,
+      default_bounds = .lwu_hrf_default_bounds, # Keep reference to original function
       active_bounds = final_bounds      # Store the bounds being used
     )
   } else {
-    stop(paste("Unsupported HRF model:", model), call. = FALSE)
+    # For other models, return the registry interface directly
+    # Only LWU model is currently supported
+    stop("Unknown HRF model: ", model, ". Currently only 'lwu' is supported.", call. = FALSE)
   }
 }

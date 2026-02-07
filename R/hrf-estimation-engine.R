@@ -9,12 +9,12 @@
 .run_hrf_estimation_engine <- function(
   fmri_data,
   event_model,
-  parametric_hrf = "lwu",
+  parametric_model = "lwu",
   # Basic parameters
   theta_seed = NULL,
   theta_bounds = NULL,
   confound_formula = NULL,
-  baseline_model = "intercept",
+  baseline_model = NULL,
   hrf_eval_times = NULL,
   hrf_span = 30,
   lambda_ridge = 0.01,
@@ -44,7 +44,8 @@
   # Safety and diagnostics
   safety_mode = c("balanced", "maximum", "performance"),
   progress = TRUE,
-  verbose = TRUE
+  verbose = TRUE,
+  prepared_inputs = NULL
 ) {
   
   # Start timing
@@ -64,50 +65,19 @@
   
   # Initialize progress tracking
   if (progress && verbose) {
-    cat("╔══════════════════════════════════════════════════════════════╗\n")
-    cat("║          Parametric HRF estimation in progress (v2)          ║\n")
-    cat("╚══════════════════════════════════════════════════════════════╝\n\n")
+    cat("================================================================\n")
+    cat("|          Parametric HRF estimation in progress (v2)          |\n")
+    cat("================================================================\n\n")
   }
   
-  # Get base HRF interface from registry
-  base_interface <- .get_hrf_interface(parametric_hrf)
-  
-  # Create HRF interface with user-specified bounds
-  if (parametric_hrf == "lwu") {
-    # For LWU, we need to wrap the functions to use the specified bounds
-    final_bounds <- if (!is.null(theta_bounds)) {
-      # Ensure sigma lower bound is at least 0.051
-      if (theta_bounds$lower[2] < 0.051) {
-        warning("Adjusting sigma lower bound to 0.051 for numerical stability", call. = FALSE)
-        theta_bounds$lower[2] <- 0.051
-      }
-      theta_bounds
-    } else {
-      base_interface$default_bounds()
-    }
-    
-    hrf_interface <- list(
-      hrf_function = function(t, params_vector, ...) {
-        base_interface$hrf_function(t, params_vector, bounds = final_bounds, ...)
-      },
-      taylor_basis = function(params_vector0, t_hrf_eval, ...) {
-        base_interface$taylor_basis(params_vector0, t_hrf_eval, bounds = final_bounds, ...)
-      },
-      parameter_names = base_interface$parameter_names,
-      default_seed = base_interface$default_seed,
-      default_bounds = base_interface$default_bounds,
-      active_bounds = final_bounds
-    )
-  } else {
-    # For other models, use the base interface as-is
-    hrf_interface <- base_interface
-    hrf_interface$active_bounds <- theta_bounds
-  }
+  # Create HRF interface with user-specified bounds using factory
+  # This will throw the appropriate error if the model is not registered
+  hrf_interface <- .create_hrf_interface(parametric_model, user_bounds = theta_bounds)
   
   # Package all configuration into a single list
   config <- list(
     # Original parameters
-    parametric_hrf = parametric_hrf,
+    parametric_model = parametric_model,
     theta_seed = theta_seed,
     theta_bounds = theta_bounds,
     confound_formula = confound_formula,
@@ -137,12 +107,21 @@
   # Execute stages in sequence
   tryCatch({
     # Stage 0: Validation and data preparation
-    stage0_results <- .stage0_validate_and_prepare(
-      fmri_data = fmri_data,
-      event_model = event_model,
-      hrf_interface = hrf_interface,
-      config = config
-    )
+    stage0_results <- if (is.null(prepared_inputs)) {
+      .stage0_validate_and_prepare(
+        fmri_data = fmri_data,
+        event_model = event_model,
+        hrf_interface = hrf_interface,
+        config = config
+      )
+    } else {
+      if (verbose) cat("-> Stage 0: Using precomputed design inputs...\n")
+      .stage0_use_prepared_inputs(
+        prepared_inputs = prepared_inputs,
+        baseline_model = baseline_model,
+        verbose = verbose
+      )
+    }
     
     # Stage 1: Parameter initialization
     stage1_results <- .stage1_initialize_parameters(
@@ -204,12 +183,12 @@
   total_time <- as.numeric(difftime(Sys.time(), total_start, units = "secs"))
   
   if (verbose) {
-    cat("\n╔══════════════════════════════════════════════════════════════╗\n")
-    cat("║                    ESTIMATION COMPLETE                       ║\n")
-    cat("╚══════════════════════════════════════════════════════════════╝\n")
+    cat("\n================================================================\n")
+    cat("|                    ESTIMATION COMPLETE                       |\n")
+    cat("================================================================\n")
     cat(sprintf("Total time: %.2f seconds (%.0f voxels/second)\n",
                 total_time, stage0_results$n_vox / total_time))
-    cat(sprintf("Final mean R²: %.3f\n", mean(final_results$r_squared)))
+    cat(sprintf("Final mean R^2: %.3f\n", mean(final_results$r_squared)))
   }
   
   # Package and return results
@@ -220,10 +199,4 @@
     config = config,
     total_time = total_time
   )
-}
-
-#' Create HRF interface (helper function)
-#' @keywords internal
-.create_hrf_interface <- function(model = "lwu") {
-  .get_hrf_interface(model)
 }

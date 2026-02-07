@@ -16,9 +16,8 @@ test_that("estimate_parametric_hrf works with basic inputs", {
   result <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_design,
-    parametric_hrf = "lwu",
-    verbose = FALSE,
-
+    parametric_model = "lwu",
+    verbose = FALSE
   )
   
   expect_s3_class(result, "parametric_hrf_fit")
@@ -33,8 +32,8 @@ test_that("estimate_parametric_hrf validates inputs correctly", {
   
   # Test invalid HRF model
   expect_error(
-    estimate_parametric_hrf(fmri_data, event_design, parametric_hrf = "invalid"),
-    "HRF model 'invalid' is not registered"
+    estimate_parametric_hrf(fmri_data, event_design, parametric_model = "invalid"),
+    "invalid"
   )
   
   # Test invalid theta_seed length
@@ -49,7 +48,7 @@ test_that("estimate_parametric_hrf validates inputs correctly", {
   expect_error(
     estimate_parametric_hrf(fmri_data, event_design, 
                            theta_bounds = list(lower = c(1, 2, 3))),
-    "length\\(params_vector0\\) not equal to 3"
+    "theta_bounds missing required elements: upper"
   )
   
   # Test non-logical verbose
@@ -72,10 +71,11 @@ test_that("estimate_parametric_hrf returns expected structure", {
   
   # Check structure - current fit object contains a richer set of fields
   expected_names <- c(
-    "estimated_parameters", "amplitudes", "parameter_names", "hrf_model",
-    "r_squared", "residuals", "parameter_ses", "convergence_info",
-    "metadata", "parameters", "convergence", "standard_errors",
-    "se_amplitudes", "fit_quality", "refinement_info"
+    "estimated_parameters", "amplitudes", "parameter_names", "parametric_model",
+    "r_squared", "residuals", "convergence_info",
+    "metadata", "standard_errors",
+    "se_amplitudes", "fit_quality", "refinement_info", "model_specific", "hrf_shape",
+    "design_info", "gof_per_voxel", "method_used"
   )
   expect_setequal(names(result), expected_names)
   
@@ -84,7 +84,7 @@ test_that("estimate_parametric_hrf returns expected structure", {
   expect_equal(length(result$amplitudes), ncol(fmri_data))
   
   # Check metadata
-  expect_equal(result$metadata$hrf_model, "lwu")
+  expect_equal(result$metadata$parametric_model, "lwu")
   expect_equal(result$metadata$n_voxels, 10)
   expect_equal(result$metadata$n_timepoints, 20)
 })

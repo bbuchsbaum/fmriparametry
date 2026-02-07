@@ -7,7 +7,7 @@
 #' @param estimated_parameters numeric matrix of parameter estimates (voxels x parameters)
 #' @param amplitudes numeric vector of fitted amplitudes
 #' @param parameter_names character vector naming the parameters
-#' @param hrf_model character string identifying the HRF model
+#' @param parametric_model character string identifying the HRF model
 #' @param r_squared numeric vector of R-squared values for each voxel
 #' @param residuals numeric matrix of residuals (timepoints x voxels) or NULL
 #' @param parameter_ses numeric matrix of standard errors (voxels x parameters) or NULL
@@ -21,12 +21,13 @@ new_parametric_hrf_fit <- function(
   estimated_parameters,
   amplitudes,
   parameter_names,
-  hrf_model = "lwu",
+  parametric_model = "lwu",
   r_squared = NULL,
   residuals = NULL,
   parameter_ses = NULL,
   convergence_info = list(),
-  metadata = list()
+  metadata = list(),
+  hrf_shape = NULL
 ) {
   # Basic validation (as before)
   assertthat::assert_that(is.matrix(estimated_parameters))
@@ -34,7 +35,7 @@ new_parametric_hrf_fit <- function(
   assertthat::assert_that(nrow(estimated_parameters) == length(amplitudes))
   assertthat::assert_that(is.character(parameter_names))
   assertthat::assert_that(ncol(estimated_parameters) == length(parameter_names))
-  assertthat::assert_that(is.character(hrf_model), length(hrf_model) == 1)
+  assertthat::assert_that(is.character(parametric_model), length(parametric_model) == 1)
   
   # New field validation
   n_vox <- nrow(estimated_parameters)
@@ -66,6 +67,14 @@ new_parametric_hrf_fit <- function(
     call = NULL,
     n_voxels = n_vox,
     n_timepoints = if(!is.null(residuals)) nrow(residuals) else NA_integer_,
+    method_used = "parametric_taylor",
+    design_info = list(
+      n_time = if(!is.null(residuals)) nrow(residuals) else NA_integer_,
+      n_vox = n_vox,
+      n_cond = NA_integer_,
+      basis_dim = ncol(estimated_parameters),
+      projected = NA
+    ),
     theta_seed = rep(NA_real_, length(parameter_names)),
     theta_bounds = list(lower = rep(NA_real_, length(parameter_names)),
                         upper = rep(NA_real_, length(parameter_names))),
@@ -78,22 +87,36 @@ new_parametric_hrf_fit <- function(
     metadata$call <- sys.call(-1)
   }
   
-  # Construct object with enhanced fields
+  # Construct object with enhanced fields using new structure
   obj <- list(
-    estimated_parameters = estimated_parameters,
+    # New standardized structure
+    model_specific = list(
+      parameters = estimated_parameters,
+      parameter_names = parameter_names,
+      model = parametric_model,
+      standard_errors = parameter_ses
+    ),
+    
+    # Pre-computed HRF shapes
+    hrf_shape = hrf_shape,
+    
+    # Top-level fields
     amplitudes = as.numeric(amplitudes),
-    parameter_names = parameter_names,
-    hrf_model = hrf_model,
     r_squared = r_squared,
     residuals = residuals,
-    parameter_ses = parameter_ses,
     convergence_info = convergence_info,
     metadata = metadata
   )
 
-  # For backward compatibility, also include old fields
-  obj$parameters <- obj$estimated_parameters
-  obj$convergence <- convergence_info
+  # Set convenient top-level access
+  obj$parameter_names <- obj$model_specific$parameter_names
+  obj$parametric_model <- obj$model_specific$model
+  obj$design_info <- metadata$design_info
+  obj$gof_per_voxel <- r_squared
+  obj$method_used <- metadata$method_used
+  
+  # Add backward compatibility field
+  obj$estimated_parameters <- obj$model_specific$parameters
   
   # Add fields expected by tests but not included in constructor
   obj$standard_errors <- parameter_ses  # Use the passed value or NULL
@@ -105,13 +128,6 @@ new_parametric_hrf_fit <- function(
   obj
 }
 
-#' Check if a parametric_hrf_fit has Sprint 2 enhancements
-#' @param x parametric_hrf_fit object
-#' @return Logical indicating if object has Sprint 2 fields
-#' @keywords internal
-is_v2_fit <- function(x) {
-  !is.null(x$r_squared) || !is.null(x$residuals) || !is.null(x$parameter_ses)
-}
 
 #' Get fitted values from parametric_hrf_fit
 #' @param x parametric_hrf_fit object  
@@ -142,4 +158,33 @@ n_voxels <- function(x) {
 #' @keywords internal
 n_timepoints <- function(x) {
   x$metadata$n_timepoints
+}
+
+#' Generate HRF shapes from parameters
+#' 
+#' Pre-computes HRF curves for all voxels for efficient plotting
+#' 
+#' @param parameters Matrix of HRF parameters (voxels x parameters)
+#' @param amplitudes Vector of amplitude values
+#' @param times Time points for HRF evaluation
+#' @param model Character string specifying HRF model
+#' @param hrf_interface Optional pre-created HRF interface
+#' @return Matrix of HRF curves (time points x voxels)
+#' @keywords internal
+.generate_hrf_shape <- function(parameters, amplitudes, times, model, 
+                               hrf_interface = NULL) {
+  if (is.null(hrf_interface)) {
+    hrf_interface <- .create_hrf_interface(model)
+  }
+  
+  n_vox <- nrow(parameters)
+  n_time <- length(times)
+  hrf_shape <- matrix(NA_real_, n_time, n_vox)
+  
+  for (v in seq_len(n_vox)) {
+    hrf_vals <- hrf_interface$hrf_function(times, parameters[v, ])
+    hrf_shape[, v] <- hrf_vals * amplitudes[v]
+  }
+  
+  hrf_shape
 }
