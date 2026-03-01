@@ -1,15 +1,26 @@
 ---
-title: "Technical Details: Mathematics of Taylor-Based HRF Estimation"
-author: "fmriparametric package authors"
-date: "`r Sys.Date()`"
+title: 'Technical Details: Mathematics of Taylor-Based HRF Estimation'
+author: fmriparametric package authors
+date: '`r Sys.Date()`'
 output: rmarkdown::html_vignette
-vignette: >
-  %\VignetteIndexEntry{Technical Details: Mathematics of Taylor-Based HRF Estimation}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+vignette: '%\VignetteIndexEntry{Technical Details: Mathematics of Taylor-Based HRF
+  Estimation} %\VignetteEngine{knitr::rmarkdown} %\VignetteEncoding{UTF-8}'
+params:
+  family: red
+  preset: homage
+css: albers.css
+resource_files:
+- albers.css
+- albers.js
+includes:
+  in_header: |-
+    <script src="albers.js"></script>
+    <script>document.addEventListener('DOMContentLoaded',function(){document.body.classList.add('palette-red');});</script>
+
 ---
 
 ```{r setup, include = FALSE}
+if (exists("params") && requireNamespace("ggplot2", quietly = TRUE) && requireNamespace("albersdown", quietly = TRUE)) ggplot2::theme_set(albersdown::theme_albers(params$family))
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
