@@ -12,19 +12,39 @@
   }
   
   verbose <- config$verbose
-  if (verbose) cat("\n-> Stage 5: Computing standard errors...\n")
-  
-  se_result <- .compute_standard_errors_delta(
-    theta_hat = tiered_results$theta_current,
-    beta0 = tiered_results$amplitudes,
-    Y_proj = prepared_data$inputs$Y_proj,
-    S_target_proj = prepared_data$inputs$S_target_proj,
-    hrf_interface = hrf_interface,
-    hrf_eval_times = prepared_data$inputs$hrf_eval_times
-  )
+  se_method <- config$se_method %||% "delta"
+  if (!identical(se_method, "delta") && !identical(se_method, "sandwich")) {
+    stop("Unknown se_method: ", se_method, ". Expected 'delta' or 'sandwich'.", call. = FALSE)
+  }
+
+  if (verbose) {
+    cat("\n-> Stage 5: Computing standard errors (", se_method, ")...\n", sep = "")
+  }
+
+  se_result <- if (identical(se_method, "sandwich")) {
+    .compute_standard_errors_sandwich(
+      theta_hat = tiered_results$theta_current,
+      beta0 = tiered_results$amplitudes,
+      Y_proj = prepared_data$inputs$Y_proj,
+      S_target_proj = prepared_data$inputs$S_target_proj,
+      hrf_interface = hrf_interface,
+      hrf_eval_times = prepared_data$inputs$hrf_eval_times,
+      baseline_model = config$baseline_model
+    )
+  } else {
+    .compute_standard_errors_delta(
+      theta_hat = tiered_results$theta_current,
+      beta0 = tiered_results$amplitudes,
+      Y_proj = prepared_data$inputs$Y_proj,
+      S_target_proj = prepared_data$inputs$S_target_proj,
+      hrf_interface = hrf_interface,
+      hrf_eval_times = prepared_data$inputs$hrf_eval_times
+    )
+  }
   
   tiered_results$se_theta <- se_result$se_theta_hat
   tiered_results$se_amplitudes <- se_result$se_beta0
+  tiered_results$se_method <- se_method
   
   tiered_results
 }
@@ -102,11 +122,16 @@
   }
   
   # Create fit quality object
+  r_squared_raw <- final_results$r_squared_raw %||% final_results$r_squared
   fit_quality <- list(
     r_squared = final_results$r_squared,
+    r_squared_raw = r_squared_raw,
     mean_r2 = mean(final_results$r_squared),
     min_r2 = min(final_results$r_squared),
     max_r2 = max(final_results$r_squared),
+    mean_r2_raw = mean(r_squared_raw),
+    min_r2_raw = min(r_squared_raw),
+    max_r2_raw = max(r_squared_raw),
     rmse = rmse,
     mean_rmse = if (!is.null(rmse)) mean(rmse) else NA
   )
@@ -146,6 +171,8 @@
       tiered_refinement = config$tiered_refinement,
       parallel = config$parallel,
       n_cores = config$n_cores,
+      compute_se = config$compute_se,
+      se_method = config$se_method %||% "delta",
       safety_mode = config$safety_mode
     ),
     timing = list(

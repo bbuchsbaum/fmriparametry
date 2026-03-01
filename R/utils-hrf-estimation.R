@@ -2,6 +2,58 @@
 # These functions are used by both legacy and refactored implementations
 
 
+#' Generate a grid of seed points for multi-seed estimation
+#'
+#' Creates a set of seed points spanning the LWU parameter space.
+#' Each seed is clamped to the active bounds.
+#'
+#' @param theta_bounds List with `lower` and `upper` bound vectors
+#' @param user_grid Optional matrix (n_seeds x n_params) of user-specified seeds
+#' @return Matrix of seed points (n_seeds x n_params)
+#' @keywords internal
+.generate_seed_grid <- function(theta_bounds, user_grid = NULL) {
+  n_params <- length(theta_bounds$lower)
+
+  if (!is.null(user_grid)) {
+    if (!is.matrix(user_grid)) {
+      user_grid <- matrix(user_grid, ncol = n_params, byrow = TRUE)
+    } else if (ncol(user_grid) != n_params) {
+      stop("user_grid must have one column per parameter", call. = FALSE)
+    }
+    # Clamp each seed to bounds
+    for (i in seq_len(nrow(user_grid))) {
+      user_grid[i, ] <- pmax(theta_bounds$lower, pmin(theta_bounds$upper, user_grid[i, ]))
+    }
+    return(user_grid)
+  }
+
+  # Fallback for non-LWU models: center point + lower/upper corners.
+  if (n_params != 3L) {
+    center <- (theta_bounds$lower + theta_bounds$upper) / 2
+    grid <- rbind(center, theta_bounds$lower, theta_bounds$upper)
+    return(unique(grid))
+  }
+
+  # Default 5-point grid covering the LWU space
+  # [tau, sigma, rho]
+  grid <- rbind(
+    c(6.0, 2.5, 0.35),   # default center
+    c(3.0, 1.5, 0.25),   # early, narrow HRF
+    c(9.0, 3.0, 0.50),   # late, wide HRF
+    c(5.0, 1.0, 0.15),   # narrow with minimal undershoot
+    c(7.0, 4.0, 0.60)    # wide with strong undershoot
+  )
+
+  # Clamp to active bounds
+  for (i in seq_len(nrow(grid))) {
+    grid[i, ] <- pmax(theta_bounds$lower, pmin(theta_bounds$upper, grid[i, ]))
+  }
+
+  # Remove duplicate rows after clamping
+  grid <- unique(grid)
+  grid
+}
+
 #' Compute data-driven initial HRF parameters
 #'
 #' Estimates latency and width by cross-correlating the average high-variance
@@ -222,4 +274,139 @@
   )
 
   return(res)
+}
+
+.invert_psd_safe <- function(A, rel_tol = 1e-10) {
+  if (!is.matrix(A) || nrow(A) != ncol(A) || nrow(A) == 0) {
+    return(NULL)
+  }
+  if (any(!is.finite(A))) {
+    return(NULL)
+  }
+
+  A <- 0.5 * (A + t(A))
+  eig <- tryCatch(eigen(A, symmetric = TRUE), error = function(...) NULL)
+  if (is.null(eig) || any(!is.finite(eig$values)) || any(!is.finite(eig$vectors))) {
+    return(NULL)
+  }
+
+  scale <- max(abs(eig$values))
+  if (!is.finite(scale) || scale <= 0) {
+    return(NULL)
+  }
+  keep <- eig$values > (scale * rel_tol)
+  if (!any(keep)) {
+    return(NULL)
+  }
+
+  V <- eig$vectors[, keep, drop = FALSE]
+  inv_vals <- 1 / eig$values[keep]
+  inv_A <- V %*% (diag(inv_vals, nrow = length(inv_vals)) %*% t(V))
+  if (any(!is.finite(inv_A))) {
+    return(NULL)
+  }
+  inv_A
+}
+
+#' Compute heteroskedasticity-robust standard errors
+#'
+#' Uses a sandwich covariance estimator (HC0) for profiled Gauss-Newton Jacobians.
+#' This is slower than the delta approximation but more robust under
+#' heteroskedastic residual variance.
+#'
+#' @keywords internal
+.compute_standard_errors_sandwich <- function(
+  theta_hat, beta0, Y_proj, S_target_proj,
+  hrf_interface, hrf_eval_times, baseline_model = NULL
+) {
+  n_time <- nrow(Y_proj)
+  n_vox <- ncol(Y_proj)
+  n_params <- length(hrf_interface$parameter_names)
+  has_intercept <- .is_intercept_baseline(baseline_model)
+
+  if (!is.matrix(theta_hat) || length(dim(theta_hat)) != 2) {
+    theta_hat <- matrix(theta_hat, nrow = n_vox, ncol = n_params, byrow = FALSE)
+  }
+
+  se_theta_hat <- matrix(NA_real_, nrow = n_vox, ncol = n_params)
+  colnames(se_theta_hat) <- hrf_interface$parameter_names
+  se_beta0 <- rep(NA_real_, n_vox)
+
+  stim_signal <- .extract_primary_stimulus(S_target_proj)
+
+  for (v in seq_len(n_vox)) {
+    theta_v <- as.numeric(theta_hat[v, ])
+    y_v <- as.numeric(Y_proj[, v])
+
+    jac_info <- .get_jacobian_and_residuals_fast(
+      theta = theta_v,
+      y = y_v,
+      stim_signal = stim_signal,
+      t_hrf = hrf_eval_times,
+      hrf_interface = hrf_interface,
+      n_time = n_time,
+      conv_context = NULL,
+      theta_bounds = NULL,
+      has_intercept = has_intercept
+    )
+    if (is.null(jac_info)) {
+      next
+    }
+
+    J <- jac_info$jacobian
+    e <- as.numeric(jac_info$residuals)
+    if (!is.matrix(J) || nrow(J) != n_time || ncol(J) != n_params) {
+      next
+    }
+    if (length(e) != n_time || any(!is.finite(e)) || any(!is.finite(J))) {
+      next
+    }
+
+    bread_inv <- .invert_psd_safe(crossprod(J))
+    if (is.null(bread_inv)) {
+      next
+    }
+    Je <- J * e
+    meat <- crossprod(Je)
+    cov_theta <- bread_inv %*% meat %*% bread_inv
+    d_theta <- diag(cov_theta)
+    d_theta[!is.finite(d_theta) | d_theta < 0] <- 0
+    se_theta_hat[v, ] <- sqrt(d_theta)
+
+    hrf_vals <- hrf_interface$hrf_function(hrf_eval_times, theta_v)
+    if (!is.numeric(hrf_vals) || any(!is.finite(hrf_vals))) {
+      next
+    }
+    x_hrf <- .convolve_signal_with_kernels(
+      signal = stim_signal,
+      kernels = matrix(hrf_vals, ncol = 1),
+      output_length = n_time
+    )[, 1]
+    if (any(!is.finite(x_hrf))) {
+      next
+    }
+
+    X <- if (has_intercept) cbind(1, x_hrf) else matrix(x_hrf, ncol = 1)
+    XtX_inv <- .invert_psd_safe(crossprod(X))
+    if (is.null(XtX_inv)) {
+      next
+    }
+    beta_hat <- XtX_inv %*% crossprod(X, y_v)
+    resid_lm <- as.numeric(y_v - X %*% beta_hat)
+    if (any(!is.finite(resid_lm))) {
+      next
+    }
+    Xe <- X * resid_lm
+    cov_beta <- XtX_inv %*% crossprod(Xe) %*% XtX_inv
+    beta_idx <- if (has_intercept) 2L else 1L
+    beta_var <- cov_beta[beta_idx, beta_idx]
+    if (is.finite(beta_var) && beta_var >= 0) {
+      se_beta0[v] <- sqrt(beta_var)
+    }
+  }
+
+  list(
+    se_theta_hat = se_theta_hat,
+    se_beta0 = se_beta0
+  )
 }

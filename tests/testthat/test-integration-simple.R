@@ -22,7 +22,7 @@ test_that("estimate_parametric_hrf integration with minimal data", {
   fit <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     verbose = FALSE
   )
   
@@ -73,7 +73,7 @@ test_that("estimate_parametric_hrf with realistic synthetic data", {
   # Generate HRF and convolve with events
   t_hrf <- seq(0, 30, length.out = 61)
   hrf_true <- lwu_hrf(t_hrf, true_params[1], true_params[2], true_params[3])
-  conv_signal <- convolve(event_model[, 1], rev(hrf_true), type = "open")[1:n_time]
+  conv_signal <- stats::convolve(event_model[, 1], rev(hrf_true), type = "open")[1:n_time]
   
   # Create realistic fMRI data
   fmri_data <- matrix(0, n_time, n_vox)
@@ -88,7 +88,7 @@ test_that("estimate_parametric_hrf with realistic synthetic data", {
   fit <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     verbose = FALSE
   )
   
@@ -116,7 +116,7 @@ test_that("S3 methods work correctly", {
   fit <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     verbose = FALSE
   )
   
@@ -145,7 +145,7 @@ test_that("estimation handles edge cases gracefully", {
     fit1 <- estimate_parametric_hrf(
       fmri_data = fmri_data,
       event_model = event_model,
-      parametric_hrf = "lwu",
+      parametric_model = "lwu",
       verbose = FALSE
     )
   })
@@ -177,7 +177,7 @@ test_that("basic parameter bounds are reasonable", {
   fit <- estimate_parametric_hrf(
     fmri_data = fmri_data,
     event_model = event_model,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     verbose = FALSE
   )
   

@@ -43,7 +43,7 @@
       basis <- matrix(basis, ncol = n_params + 1)
     }
 
-    X <- .convolve_signal_with_kernels(S_target_proj[, 1], basis, n_time)
+    X <- .convolve_signal_with_kernels(S_target_proj, basis, n_time)
     has_intercept <- .is_intercept_baseline(baseline_model)
     if (has_intercept) {
       X <- cbind(1, X)
@@ -111,7 +111,7 @@
 
   n_time <- nrow(Y_proj)
   n_eval <- length(hrf_eval_times)
-  signal <- S_target_proj[, 1]
+  signal <- S_target_proj
 
   kernels <- vapply(
     voxel_idx,
@@ -131,4 +131,115 @@
   valid <- is.finite(denom) & denom >= 1e-10
   amps[valid] <- numer[valid] / denom[valid]
   amps
+}
+
+#' Recompute linear fit terms for fixed theta estimates
+#'
+#' For each voxel, computes the convolved predictor from `theta_hat`, then fits
+#' amplitude (and optional intercept) with a small linear model to ensure
+#' residuals/intercepts/R^2 remain internally consistent after refinement.
+#'
+#' @param theta_hat Matrix of parameter estimates (voxels x params)
+#' @param Y_proj Projected BOLD data (time x voxels)
+#' @param S_target_proj Projected stimulus design (time x regressors)
+#' @param hrf_interface HRF model interface
+#' @param hrf_eval_times HRF evaluation grid
+#' @param baseline_model Baseline model specifier
+#' @return List with `amplitudes`, `intercepts`, `residuals`, `r_squared`,
+#'   and `r_squared_raw`
+#' @noRd
+.recompute_linear_terms <- function(
+  theta_hat,
+  Y_proj,
+  S_target_proj,
+  hrf_interface,
+  hrf_eval_times,
+  baseline_model = NULL,
+  amplitudes = NULL
+) {
+  if (!is.matrix(theta_hat)) {
+    stop("theta_hat must be a matrix", call. = FALSE)
+  }
+  n_time <- nrow(Y_proj)
+  n_vox <- ncol(Y_proj)
+  if (!is.null(amplitudes)) {
+    amplitudes <- as.numeric(amplitudes)
+    if (length(amplitudes) != n_vox) {
+      stop("amplitudes length must match number of voxels", call. = FALSE)
+    }
+  }
+  has_intercept <- .is_intercept_baseline(baseline_model)
+
+  kernels <- vapply(
+    seq_len(n_vox),
+    function(v) hrf_interface$hrf_function(hrf_eval_times, theta_hat[v, ]),
+    FUN.VALUE = numeric(length(hrf_eval_times))
+  )
+  if (!is.matrix(kernels)) {
+    kernels <- matrix(kernels, ncol = n_vox)
+  }
+
+  x_pred <- .convolve_signal_with_kernels(S_target_proj, kernels, n_time)
+  if (!is.matrix(x_pred) || !identical(dim(x_pred), dim(Y_proj))) {
+    stop("Failed to build predictor matrix for recompute_linear_terms", call. = FALSE)
+  }
+
+  amplitudes_out <- numeric(n_vox)
+  intercepts <- if (has_intercept) numeric(n_vox) else NULL
+  fitted <- matrix(0, nrow = n_time, ncol = n_vox)
+
+  for (v in seq_len(n_vox)) {
+    x <- x_pred[, v]
+    y <- Y_proj[, v]
+
+    beta_fixed <- if (!is.null(amplitudes)) amplitudes[v] else NULL
+
+    if (has_intercept) {
+      if (is.null(beta_fixed)) {
+        x_centered <- x - mean(x)
+        y_centered <- y - mean(y)
+        denom <- sum(x_centered^2)
+        if (is.finite(denom) && denom > 1e-10) {
+          beta <- sum(x_centered * y_centered) / denom
+        } else {
+          beta <- 0
+        }
+      } else {
+        beta <- beta_fixed
+      }
+      alpha <- mean(y) - beta * mean(x)
+      amplitudes_out[v] <- beta
+      intercepts[v] <- alpha
+      fitted[, v] <- alpha + beta * x
+    } else {
+      if (is.null(beta_fixed)) {
+        denom <- sum(x^2)
+        if (is.finite(denom) && denom > 1e-10) {
+          beta <- sum(x * y) / denom
+        } else {
+          beta <- 0
+        }
+      } else {
+        beta <- beta_fixed
+      }
+      amplitudes_out[v] <- beta
+      fitted[, v] <- beta * x
+    }
+  }
+
+  residuals <- Y_proj - fitted
+  fit_metrics <- .calculate_fit_metrics(
+    y_true = Y_proj,
+    y_pred = fitted,
+    n_predictors = 1L,
+    has_intercept = has_intercept
+  )
+
+  list(
+    amplitudes = amplitudes_out,
+    intercepts = intercepts,
+    residuals = residuals,
+    r_squared = fit_metrics$r_squared,
+    r_squared_raw = fit_metrics$r_squared_raw
+  )
 }

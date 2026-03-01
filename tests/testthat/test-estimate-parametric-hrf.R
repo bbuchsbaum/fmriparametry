@@ -148,3 +148,41 @@ test_that("estimate_parametric_hrf respects parameter bounds", {
   expect_true(all(params[,3] >= custom_bounds$lower[3] & 
                  params[,3] <= custom_bounds$upper[3]))
 })
+
+test_that("estimate_parametric_hrf supports sandwich standard errors", {
+  set.seed(9001)
+  n_time <- 80
+  n_vox <- 4
+  fmri_data <- matrix(rnorm(n_time * n_vox), nrow = n_time, ncol = n_vox)
+  event_design <- matrix(0, nrow = n_time, ncol = 1)
+  event_design[seq(10, 70, by = 12), 1] <- 1
+
+  fit <- estimate_parametric_hrf(
+    fmri_data = fmri_data,
+    event_model = event_design,
+    compute_se = TRUE,
+    se_method = "sandwich",
+    tiered_refinement = "none",
+    verbose = FALSE
+  )
+
+  expect_equal(fit$metadata$settings$se_method, "sandwich")
+  expect_true(is.matrix(fit$standard_errors))
+  expect_equal(dim(fit$standard_errors), c(n_vox, 3))
+  expect_gt(sum(is.finite(fit$standard_errors)), 0)
+})
+
+test_that("estimate_parametric_hrf validates se_method choices", {
+  fmri_data <- matrix(rnorm(60), nrow = 20, ncol = 3)
+  event_design <- matrix(rbinom(20, 1, 0.2), ncol = 1)
+
+  expect_error(
+    estimate_parametric_hrf(
+      fmri_data = fmri_data,
+      event_model = event_design,
+      se_method = "bad_method",
+      verbose = FALSE
+    ),
+    "one of"
+  )
+})

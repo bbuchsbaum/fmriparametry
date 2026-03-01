@@ -241,7 +241,7 @@
   }
   
   # Ensure theta_seed is within safe bounds
-  eps <- c(0.01, 0.01, 0.01)
+  eps <- rep(0.01, n_params)
   theta_seed <- as.numeric(.clamp_theta_to_bounds(
     theta = theta_seed,
     theta_bounds = theta_bounds,
@@ -299,40 +299,136 @@
 .stage2_core_estimation <- function(prepared_data, init_params, hrf_interface, config) {
   verbose <- config$verbose
   if (verbose) cat("\n-> Stage 2: Core parametric estimation...\n")
-  
+
   # Parallel processing not yet implemented
   parallel_config <- NULL
   process_function <- .parametric_engine
-  
-  # Run core engine
-  args <- list(
-    Y_proj = prepared_data$inputs$Y_proj,
-    S_target_proj = prepared_data$inputs$S_target_proj,
-    hrf_eval_times = prepared_data$inputs$hrf_eval_times,
-    hrf_interface = hrf_interface,
-    theta_seed = init_params$theta_seed,
-    theta_bounds = init_params$theta_bounds,
-    lambda_ridge = config$lambda_ridge,
-    baseline_model = config$baseline_model
-  )
-  
-  # Parallel config would be added here when implemented
-  
-  core_result <- do.call(process_function, args)
-  
+
+  use_multi_seed <- isTRUE(config$multi_seed)
+
+  # --- Single-seed path (original behavior) ---
+  if (!use_multi_seed) {
+    args <- list(
+      Y_proj = prepared_data$inputs$Y_proj,
+      S_target_proj = prepared_data$inputs$S_target_proj,
+      hrf_eval_times = prepared_data$inputs$hrf_eval_times,
+      hrf_interface = hrf_interface,
+      theta_seed = init_params$theta_seed,
+      theta_bounds = init_params$theta_bounds,
+      lambda_ridge = config$lambda_ridge,
+      baseline_model = config$baseline_model
+    )
+    core_result <- do.call(process_function, args)
+
+  } else {
+    # --- Multi-seed path ---
+    seed_grid <- .generate_seed_grid(
+      theta_bounds = init_params$theta_bounds,
+      user_grid = config$seed_grid
+    )
+    # Always include the user/default seed as the first row
+    user_seed <- matrix(init_params$theta_seed, nrow = 1)
+    seed_grid <- rbind(user_seed, seed_grid)
+    # Remove duplicate rows (e.g. if user seed matches a grid point)
+    seed_grid <- unique(seed_grid)
+    n_seeds <- nrow(seed_grid)
+    if (verbose) cat(sprintf("  Multi-seed estimation with %d seeds\n", n_seeds))
+
+    # Run engine for each seed, keep best R² per voxel
+    best_theta   <- NULL
+    best_beta0   <- NULL
+    best_r2      <- NULL
+    best_r2_raw  <- NULL
+    best_resid   <- NULL
+    best_coeffs  <- NULL
+
+    for (s in seq_len(n_seeds)) {
+      seed_s <- as.numeric(seed_grid[s, ])
+      if (verbose) {
+        seed_str <- paste(format(round(seed_s, 4), trim = TRUE), collapse = ", ")
+        cat(sprintf("    Seed %d/%d [%s]: ", s, n_seeds, seed_str))
+      }
+
+      result_s <- process_function(
+        Y_proj = prepared_data$inputs$Y_proj,
+        S_target_proj = prepared_data$inputs$S_target_proj,
+        hrf_eval_times = prepared_data$inputs$hrf_eval_times,
+        hrf_interface = hrf_interface,
+        theta_seed = seed_s,
+        theta_bounds = init_params$theta_bounds,
+        lambda_ridge = config$lambda_ridge,
+        baseline_model = config$baseline_model
+      )
+
+      theta_s <- result_s$theta_hat
+      if (!is.matrix(theta_s) || length(dim(theta_s)) != 2) {
+        theta_s <- matrix(theta_s,
+                          nrow = prepared_data$n_vox,
+                          ncol = length(hrf_interface$parameter_names))
+      }
+      r2_s <- as.numeric(result_s$r_squared)
+      r2_s_raw <- if (!is.null(result_s$r_squared_raw)) {
+        as.numeric(result_s$r_squared_raw)
+      } else {
+        r2_s
+      }
+
+      if (verbose) {
+        cat(sprintf("Mean R^2 = %.3f\n", mean(r2_s)))
+      }
+
+      if (is.null(best_r2)) {
+        # First seed — accept everything
+        best_theta  <- theta_s
+        best_beta0  <- as.numeric(result_s$beta0)
+        best_r2     <- r2_s
+        best_r2_raw <- r2_s_raw
+        best_resid  <- result_s$residuals
+        best_coeffs <- result_s$coeffs
+      } else {
+        # Update voxels where this seed is better
+        improved <- is.finite(r2_s_raw) & (r2_s_raw > best_r2_raw)
+        if (any(improved)) {
+          best_theta[improved, ] <- theta_s[improved, , drop = FALSE]
+          best_beta0[improved]   <- as.numeric(result_s$beta0)[improved]
+          best_r2[improved]      <- r2_s[improved]
+          best_r2_raw[improved]  <- r2_s_raw[improved]
+          best_resid[, improved] <- result_s$residuals[, improved, drop = FALSE]
+          # coeffs update: only if same dimensions (always true for same design)
+          best_coeffs[, improved] <- result_s$coeffs[, improved, drop = FALSE]
+        }
+      }
+    }
+
+    # Package as if it were a single engine result
+    core_result <- list(
+      theta_hat = best_theta,
+      beta0 = best_beta0,
+      r_squared = best_r2,
+      r_squared_raw = best_r2_raw,
+      residuals = best_resid,
+      coeffs = best_coeffs
+    )
+  }
+
   # Update current estimates
   theta_current <- core_result$theta_hat
   amplitudes <- core_result$beta0
-  
+
   # Ensure theta_current is always a matrix
   if (!is.matrix(theta_current) || length(dim(theta_current)) != 2) {
-    theta_current <- matrix(theta_current, 
-                            nrow = prepared_data$n_vox, 
+    theta_current <- matrix(theta_current,
+                            nrow = prepared_data$n_vox,
                             ncol = length(hrf_interface$parameter_names))
     colnames(theta_current) <- hrf_interface$parameter_names
   }
-  
+
   r_squared <- core_result$r_squared
+  r_squared_raw <- if (!is.null(core_result$r_squared_raw)) {
+    as.numeric(core_result$r_squared_raw)
+  } else {
+    as.numeric(r_squared)
+  }
   guarded <- .apply_constant_voxel_guards(
     r_squared = r_squared,
     amplitudes = amplitudes,
@@ -340,18 +436,19 @@
   )
   r_squared <- guarded$r_squared
   amplitudes <- guarded$amplitudes
-  
+
   if (verbose) {
     cat(sprintf("  Initial fit: Mean R^2 = %.3f (range: %.3f - %.3f)\n",
                 mean(r_squared), min(r_squared), max(r_squared)))
   }
-  
+
   list(
     theta_current = theta_current,
     amplitudes = amplitudes,
     r_squared = r_squared,
+    r_squared_raw = r_squared_raw,
     residuals = core_result$residuals,  # Pass through residuals
-    intercepts = if (!is.null(core_result$coeffs) && 
+    intercepts = if (!is.null(core_result$coeffs) &&
                      .is_intercept_baseline(config$baseline_model)) {
                    core_result$coeffs[1, ]  # First row contains intercepts
                  } else NULL,

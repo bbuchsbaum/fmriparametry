@@ -13,6 +13,7 @@
 #'
 #' @return List containing:
 #'   \item{r_squared}{Numeric vector of R-squared values per voxel}
+#'   \item{r_squared_raw}{Unclipped raw R-squared values prior to [0,1] clipping}
 #'   \item{r_squared_adj}{Adjusted R-squared accounting for number of predictors}
 #'   \item{mse}{Mean squared error}
 #'   \item{rmse}{Root mean squared error}
@@ -89,6 +90,7 @@
   )
 
   r_squared <- core_metrics$r_squared
+  r_squared_raw <- core_metrics$r_squared_raw
   rss <- core_metrics$rss
   tss <- core_metrics$tss
   mse <- core_metrics$mse
@@ -109,6 +111,7 @@
   # Return comprehensive metrics
   list(
     r_squared = r_squared,
+    r_squared_raw = r_squared_raw,
     r_squared_adj = r_squared_adj,
     mse = mse,
     rmse = rmse,

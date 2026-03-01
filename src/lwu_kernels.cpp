@@ -138,59 +138,37 @@ inline NumericMatrix lwu_taylor_basis_impl(
   const double min_step,
   const double bound_eps
 ) {
+  (void)rel_step;
+  (void)min_step;
+  (void)bound_eps;
+
   NumericVector theta0 = clamp_lwu_theta(params_vector0, lower, upper);
-  NumericVector base_hrf = lwu_formula_impl(t_hrf_eval, theta0[0], theta0[1], theta0[2], "none");
+  const double tau = theta0[0];
+  const double sigma = theta0[1];
+  const double rho = theta0[2];
 
   const int n_time = t_hrf_eval.size();
-  const int n_params = 3;
-  NumericMatrix basis(n_time, n_params + 1);
+  NumericMatrix basis(n_time, 4);
+
+  const double sigma2 = sigma * sigma;
+  const double sigma3 = sigma2 * sigma;
+  const double inv_sigma2 = 1.0 / sigma2;
+  const double inv_sigma3 = 1.0 / sigma3;
+  const double c1 = 2.0 * sigma2;
+  const double c2 = 5.12 * sigma2; // 2 * (1.6 * sigma)^2
 
   for (int i = 0; i < n_time; ++i) {
-    basis(i, 0) = base_hrf[i];
-  }
+    const double ti = t_hrf_eval[i];
+    const double dt = ti - tau;
+    const double u = ti - tau - 2.0 * sigma;
 
-  const double step_floor[3] = {1.0, 0.2, 0.1};
+    const double term1 = std::exp(-(dt * dt) / c1);
+    const double term2_exp = std::exp(-(u * u) / c2);
 
-  for (int k = 0; k < n_params; ++k) {
-    NumericVector theta_plus = clone(theta0);
-    NumericVector theta_minus = clone(theta0);
-
-    const double step_scale = std::max(std::abs(theta0[k]), step_floor[k]);
-    const double step_size = std::max(rel_step * step_scale, min_step);
-
-    theta_plus[k] = std::min(theta0[k] + step_size, upper[k] - bound_eps);
-    theta_minus[k] = std::max(theta0[k] - step_size, lower[k] + bound_eps);
-
-    if (k == 1) {
-      theta_plus[1] = std::max(theta_plus[1], 0.051);
-      theta_minus[1] = std::max(theta_minus[1], 0.051);
-    }
-
-    const double denom = theta_plus[k] - theta_minus[k];
-
-    if (denom > 1e-10) {
-      NumericVector h_plus = lwu_formula_impl(t_hrf_eval, theta_plus[0], theta_plus[1], theta_plus[2], "none");
-      NumericVector h_minus = lwu_formula_impl(t_hrf_eval, theta_minus[0], theta_minus[1], theta_minus[2], "none");
-      for (int i = 0; i < n_time; ++i) {
-        basis(i, k + 1) = (h_plus[i] - h_minus[i]) / denom;
-      }
-    } else if (theta_plus[k] > theta0[k] + 1e-10) {
-      const double fwd_denom = theta_plus[k] - theta0[k];
-      NumericVector h_plus = lwu_formula_impl(t_hrf_eval, theta_plus[0], theta_plus[1], theta_plus[2], "none");
-      for (int i = 0; i < n_time; ++i) {
-        basis(i, k + 1) = (h_plus[i] - base_hrf[i]) / fwd_denom;
-      }
-    } else if (theta_minus[k] < theta0[k] - 1e-10) {
-      const double bwd_denom = theta0[k] - theta_minus[k];
-      NumericVector h_minus = lwu_formula_impl(t_hrf_eval, theta_minus[0], theta_minus[1], theta_minus[2], "none");
-      for (int i = 0; i < n_time; ++i) {
-        basis(i, k + 1) = (base_hrf[i] - h_minus[i]) / bwd_denom;
-      }
-    } else {
-      for (int i = 0; i < n_time; ++i) {
-        basis(i, k + 1) = 0.0;
-      }
-    }
+    basis(i, 0) = term1 - rho * term2_exp;
+    basis(i, 1) = term1 * (dt * inv_sigma2) - rho * term2_exp * (u / (2.56 * sigma2));
+    basis(i, 2) = term1 * ((dt * dt) * inv_sigma3) - rho * term2_exp * ((u * dt) / (2.56 * sigma3));
+    basis(i, 3) = -term2_exp;
   }
 
   return basis;

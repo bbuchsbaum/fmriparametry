@@ -174,6 +174,7 @@
   )
   
   r_squared <- fit_metrics$r_squared
+  r_squared_raw <- fit_metrics$r_squared_raw
 
   # DEBUG: Add detailed diagnostics (commented out for production)
   # if (any(r_squared == 0) || all(r_squared < 0.01)) {
@@ -225,6 +226,7 @@
     theta_hat = theta_hat,
     beta0 = as.numeric(beta0),  # Always return as numeric vector
     r_squared = as.numeric(r_squared),
+    r_squared_raw = as.numeric(r_squared_raw),
     residuals = residuals,
     coeffs = coeffs
   )

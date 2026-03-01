@@ -88,7 +88,7 @@
   )
 }
 
-# Fast finite-difference LWU Taylor basis used in the core engine path.
+# Fast analytic LWU Taylor basis used in the core engine path.
 .lwu_hrf_taylor_basis_fast <- function(params_vector0, t_hrf_eval, bounds, ...) {
   if (!is.numeric(params_vector0) || length(params_vector0) != 3) {
     stop("length(params_vector0) not equal to 3", call. = FALSE)
@@ -130,8 +130,7 @@
   in_bounds <- all(params_vector0 >= bounds$lower & params_vector0 <= bounds$upper)
 
   if (in_bounds) {
-    # In-bounds path: use fast C++ finite-difference basis (used by engine and
-    # matched by Rcpp kernel tests).
+    # In-bounds path: use fast C++ analytic basis.
     return(.lwu_hrf_taylor_basis_fast(params_vector0, t_hrf_eval, bounds, ...))
   }
 

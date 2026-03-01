@@ -16,20 +16,36 @@
 #' @keywords internal
 .apply_bounds <- function(params, bounds, epsilon = NULL) {
   if (is.null(bounds)) return(params)
+  if (is.null(bounds$lower) || is.null(bounds$upper)) {
+    stop("bounds must include 'lower' and 'upper'", call. = FALSE)
+  }
   
   # Handle both vector and matrix inputs
   if (is.matrix(params)) {
     n_vox <- nrow(params)
     n_params <- ncol(params)
+    if (length(bounds$lower) != n_params || length(bounds$upper) != n_params) {
+      stop("bounds length must match number of parameters", call. = FALSE)
+    }
     
     # Expand bounds to match matrix dimensions
     lower <- matrix(bounds$lower, nrow = n_vox, ncol = n_params, byrow = TRUE)
     upper <- matrix(bounds$upper, nrow = n_vox, ncol = n_params, byrow = TRUE)
+    width <- upper - lower
+    if (any(width < 0)) {
+      stop("Invalid bounds: lower values must be <= upper values", call. = FALSE)
+    }
     
     # Apply epsilon if requested (for numerical derivatives)
     if (!is.null(epsilon)) {
       if (length(epsilon) == 1) epsilon <- rep(epsilon, n_params)
-      eps_mat <- matrix(epsilon, nrow = n_vox, ncol = n_params, byrow = TRUE)
+      if (length(epsilon) != n_params) {
+        stop("epsilon length must be 1 or match number of parameters", call. = FALSE)
+      }
+      epsilon <- pmax(as.numeric(epsilon), 0)
+      max_eps <- pmax((bounds$upper - bounds$lower) / 2 - .Machine$double.eps, 0)
+      eps_safe <- pmin(epsilon, max_eps)
+      eps_mat <- matrix(eps_safe, nrow = n_vox, ncol = n_params, byrow = TRUE)
       lower <- lower + eps_mat
       upper <- upper - eps_mat
     }
@@ -40,11 +56,24 @@
     # Vector case
     lower <- bounds$lower
     upper <- bounds$upper
+    if (length(lower) != length(params) || length(upper) != length(params)) {
+      stop("bounds length must match parameter vector length", call. = FALSE)
+    }
+    width <- upper - lower
+    if (any(width < 0)) {
+      stop("Invalid bounds: lower values must be <= upper values", call. = FALSE)
+    }
     
     if (!is.null(epsilon)) {
       if (length(epsilon) == 1) epsilon <- rep(epsilon, length(params))
-      lower <- lower + epsilon
-      upper <- upper - epsilon
+      if (length(epsilon) != length(params)) {
+        stop("epsilon length must be 1 or match parameter length", call. = FALSE)
+      }
+      epsilon <- pmax(as.numeric(epsilon), 0)
+      max_eps <- pmax((upper - lower) / 2 - .Machine$double.eps, 0)
+      eps_safe <- pmin(epsilon, max_eps)
+      lower <- lower + eps_safe
+      upper <- upper - eps_safe
     }
     
     pmax(lower, pmin(params, upper))

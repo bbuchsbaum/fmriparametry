@@ -122,21 +122,15 @@
     }
     
     # Design matrix via convolution using centralized helper
-    X_design <- .convolve_signal_with_kernels(S_target_proj[, 1], X_taylor, n_time)
+    X_design <- .convolve_signal_with_kernels(S_target_proj, X_taylor, n_time)
     
     # Batch solve for all voxels in group using QR decomposition
     tryCatch({
-      # QR decomposition
-      qr_decomp <- qr(X_design)
-      Q <- qr.Q(qr_decomp)
-      R <- qr.R(qr_decomp)
-      R_ridge <- R + lambda_ridge * diag(ncol(R))
-      
       # Extract data for this group
       Y_group <- Y_proj[, group_idx, drop = FALSE]
       
-      # Batch solve
-      coeffs_new <- solve(R_ridge, t(Q) %*% Y_group)
+      # Batch solve using centralized ridge solver.
+      coeffs_new <- .ridge_linear_solve(X_design, Y_group, lambda_ridge)
       
       # Process results for each voxel in group
       for (k in seq_len(n_group)) {

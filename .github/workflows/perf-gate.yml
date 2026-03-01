@@ -1,0 +1,129 @@
+name: Performance Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      bench_reps:
+        description: "Benchmark repetitions"
+        required: false
+        default: "20"
+      max_regression_pct:
+        description: "Max allowed regression in median runtime (%)"
+        required: false
+        default: "20"
+      max_speedup_drop_pct:
+        description: "Max allowed drop in speedup-vs-reference (%)"
+        required: false
+        default: "15"
+      max_error_tol:
+        description: "Max allowed numerical error"
+        required: false
+        default: "1e-6"
+  pull_request:
+    paths:
+      - "R/**"
+      - "src/**"
+      - "benchmarks/**"
+      - ".github/workflows/perf-gate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  perf-gate:
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(join(github.event.pull_request.labels.*.name, ','), 'perf-gate') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+
+      - name: Setup R Dependencies
+        uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: |
+            any::pkgload
+
+      - name: Resolve Perf Inputs
+        id: cfg
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "bench_reps=${{ inputs.bench_reps }}" >> "$GITHUB_OUTPUT"
+            echo "max_regression_pct=${{ inputs.max_regression_pct }}" >> "$GITHUB_OUTPUT"
+            echo "max_speedup_drop_pct=${{ inputs.max_speedup_drop_pct }}" >> "$GITHUB_OUTPUT"
+            echo "max_error_tol=${{ inputs.max_error_tol }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "bench_reps=20" >> "$GITHUB_OUTPUT"
+            echo "max_regression_pct=20" >> "$GITHUB_OUTPUT"
+            echo "max_speedup_drop_pct=15" >> "$GITHUB_OUTPUT"
+            echo "max_error_tol=1e-6" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve Baseline Ref
+        id: base
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "baseline_ref=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "baseline_ref=$(git rev-parse HEAD^)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Benchmark Head
+        shell: bash
+        run: |
+          BENCH_REPS="${{ steps.cfg.outputs.bench_reps }}" \
+          BENCH_OUT="benchmarks/results/head" \
+          Rscript benchmarks/benchmark_kernel_triplet.R
+
+      - name: Checkout Baseline Worktree
+        shell: bash
+        run: |
+          git worktree add /tmp/fmriparametry-base "${{ steps.base.outputs.baseline_ref }}"
+          if [[ ! -f /tmp/fmriparametry-base/benchmarks/benchmark_kernel_triplet.R ]]; then
+            cp benchmarks/benchmark_kernel_triplet.R /tmp/fmriparametry-base/benchmarks/benchmark_kernel_triplet.R
+          fi
+
+      - name: Benchmark Baseline
+        shell: bash
+        run: |
+          cd /tmp/fmriparametry-base
+          BENCH_REPS="${{ steps.cfg.outputs.bench_reps }}" \
+          BENCH_OUT="benchmarks/results/base" \
+          Rscript benchmarks/benchmark_kernel_triplet.R
+
+      - name: Compare Benchmarks (Gate)
+        shell: bash
+        run: |
+          Rscript benchmarks/compare_kernel_triplet.R \
+            --baseline=/tmp/fmriparametry-base/benchmarks/results/base/kernel_triplet_latest.csv \
+            --candidate=benchmarks/results/head/kernel_triplet_latest.csv \
+            --max-regression-pct=${{ steps.cfg.outputs.max_regression_pct }} \
+            --max-speedup-drop-pct=${{ steps.cfg.outputs.max_speedup_drop_pct }} \
+            --max-error-tol=${{ steps.cfg.outputs.max_error_tol }} \
+            --summary-file=benchmarks/results/head/perf_gate_summary.md
+
+      - name: Append Summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f benchmarks/results/head/perf_gate_summary.md ]]; then
+            cat benchmarks/results/head/perf_gate_summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Benchmark Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-gate-results
+          path: |
+            benchmarks/results/head/
+            /tmp/fmriparametry-base/benchmarks/results/base/

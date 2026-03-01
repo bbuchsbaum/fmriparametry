@@ -87,6 +87,63 @@
   .clamp_theta_to_bounds(theta_center, theta_bounds, epsilon = boundary_eps)
 }
 
+# Group voxels by coarse theta grid cells for grouped recentering.
+#
+# Rounds current theta estimates to a coarse grid and groups voxels
+# sharing the same grid cell. Returns a list of groups, each with
+# the voxel indices and the group centroid to use as the seed.
+#
+# @param theta_current Matrix of current theta estimates (n_vox x n_params)
+# @param theta_bounds List with lower and upper bounds
+# @param grid_resolution Numeric vector of rounding resolution per parameter
+#   (default: tau to nearest 1s, sigma to nearest 0.5s, rho to nearest 0.1)
+# @return List of lists, each with `idx` (voxel indices) and `centroid` (seed)
+# @noRd
+.compute_theta_grid_groups <- function(
+  theta_current,
+  theta_bounds = NULL,
+  grid_resolution = c(1.0, 0.5, 0.1)
+) {
+  n_vox <- nrow(theta_current)
+  n_params <- ncol(theta_current)
+
+  if (!is.numeric(grid_resolution) || length(grid_resolution) == 0L) {
+    grid_resolution <- rep(0.5, n_params)
+  } else if (length(grid_resolution) < n_params) {
+    grid_resolution <- c(
+      grid_resolution,
+      rep(grid_resolution[length(grid_resolution)], n_params - length(grid_resolution))
+    )
+  } else if (length(grid_resolution) > n_params) {
+    grid_resolution <- grid_resolution[seq_len(n_params)]
+  }
+  grid_resolution <- pmax(abs(grid_resolution), 1e-8)
+
+  # Round to coarse grid
+  theta_rounded <- theta_current
+  for (j in seq_len(n_params)) {
+    theta_rounded[, j] <- round(theta_current[, j] / grid_resolution[j]) * grid_resolution[j]
+  }
+
+  # Create group keys
+  keys <- apply(theta_rounded, 1, paste, collapse = ",")
+  unique_keys <- unique(keys)
+
+  groups <- vector("list", length(unique_keys))
+  for (i in seq_along(unique_keys)) {
+    idx <- which(keys == unique_keys[i])
+    # Centroid is the mean of actual (not rounded) values in the group
+    centroid <- colMeans(theta_current[idx, , drop = FALSE])
+    # Clamp centroid to bounds
+    if (!is.null(theta_bounds)) {
+      centroid <- pmax(theta_bounds$lower, pmin(theta_bounds$upper, centroid))
+    }
+    groups[[i]] <- list(idx = idx, centroid = centroid)
+  }
+
+  groups
+}
+
 # Select voxel-wise updates for global refinement.
 # @noRd
 .select_global_refinement_updates <- function(

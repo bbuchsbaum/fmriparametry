@@ -19,6 +19,9 @@
   hrf_span = 30,
   lambda_ridge = 0.01,
   mask = NULL,
+  # Multi-seed estimation
+  multi_seed = TRUE,
+  seed_grid = NULL,
   # Global refinement
   global_refinement = TRUE,
   global_passes = 3,
@@ -41,6 +44,7 @@
   n_cores = NULL,
   # Output options
   compute_se = TRUE,
+  se_method = c("delta", "sandwich"),
   # Safety and diagnostics
   safety_mode = c("balanced", "maximum", "performance"),
   progress = TRUE,
@@ -53,6 +57,7 @@
   
   # Match arguments
   tiered_refinement <- match.arg(tiered_refinement)
+  se_method <- match.arg(se_method)
   safety_mode <- match.arg(safety_mode)
   
   # Validate basic inputs
@@ -86,6 +91,8 @@
     hrf_span = hrf_span,
     lambda_ridge = lambda_ridge,
     mask = mask,
+    multi_seed = multi_seed,
+    seed_grid = seed_grid,
     global_refinement = global_refinement,
     global_passes = global_passes,
     convergence_epsilon = convergence_epsilon,
@@ -97,6 +104,7 @@
     parallel = parallel,
     n_cores = n_cores,
     compute_se = compute_se,
+    se_method = se_method,
     safety_mode = safety_mode,
     progress = progress,
     verbose = verbose,

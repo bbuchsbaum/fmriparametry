@@ -52,10 +52,12 @@
   min_line_search_alpha = 1e-6,
   parallel = FALSE,
   n_cores = NULL,
-  parallel_min_voxels = 200L
+  parallel_min_voxels = 200L,
+  baseline_model = NULL
 ) {
   n_params <- ncol(theta_hat_voxel)
   n_time <- nrow(Y_proj)
+  has_intercept <- .is_intercept_baseline(baseline_model)
   
   # Use unified convergence config if provided, otherwise use defaults
   if (is.null(convergence_config)) {
@@ -133,7 +135,8 @@
       step_size = step_size,
       max_line_search_steps = max_line_search_steps,
       min_line_search_alpha = min_line_search_alpha,
-      conv_context = conv_context
+      conv_context = conv_context,
+      has_intercept = has_intercept
     )
   }
 
@@ -261,7 +264,8 @@
   step_size,
   max_line_search_steps,
   min_line_search_alpha,
-  conv_context
+  conv_context,
+  has_intercept
 ) {
   theta_initial <- as.numeric(theta_initial)
   if (length(theta_initial) != n_params || any(!is.finite(theta_initial))) {
@@ -288,7 +292,7 @@
     ))
   }
 
-  y_centered_ss <- sum((y_v - mean(y_v))^2)
+  tss_value <- .compute_tss_for_r2(y_v, has_intercept = has_intercept)
   theta_current <- theta_initial
   theta_best <- theta_current
   r2_best <- r2_initial
@@ -301,7 +305,8 @@
     hrf_interface,
     n_time,
     conv_context = conv_context,
-    theta_bounds = theta_bounds
+    theta_bounds = theta_bounds,
+    has_intercept = has_intercept
   )
   if (!is.finite(obj_current)) {
     return(list(
@@ -317,6 +322,7 @@
 
   alpha_base <- step_size
   identity_n <- diag(n_params)
+  damping <- max(as.numeric(lambda_ridge), 1e-8)
   converged <- FALSE
   status <- "max_iterations"
   iter_used <- 0L
@@ -331,7 +337,8 @@
       hrf_interface,
       n_time,
       conv_context = conv_context,
-      theta_bounds = theta_bounds
+      theta_bounds = theta_bounds,
+      has_intercept = has_intercept
     )
     if (is.null(jacob_info)) {
       status <- "singular_system"
@@ -340,45 +347,68 @@
 
     J <- jacob_info$jacobian
     residuals <- jacob_info$residuals
-    JtJ_ridge <- crossprod(J) + lambda_ridge * identity_n
-    Jtr <- crossprod(J, residuals)
-    delta <- .solve_gn_direction(JtJ_ridge, Jtr)
-    if (is.null(delta) || length(delta) != n_params) {
-      status <- "singular_system"
-      break
+    obj_iter <- if (is.numeric(jacob_info$objective) &&
+                    length(jacob_info$objective) == 1L &&
+                    is.finite(jacob_info$objective)) {
+      as.numeric(jacob_info$objective)
+    } else {
+      sum(residuals^2)
+    }
+    if (is.finite(obj_iter)) {
+      obj_current <- obj_iter
     }
 
-    alpha <- alpha_base
+    JtJ <- crossprod(J)
+    Jtr <- crossprod(J, residuals)
+
     accepted <- FALSE
     accepted_alpha <- alpha_base
     theta_new <- theta_current
     obj_new <- obj_current
+    used_damping <- damping
 
-    for (ls_iter in seq_len(max_line_search_steps)) {
-      theta_proposal <- .apply_bounds(theta_current + alpha * delta, theta_bounds)
-      obj_proposal <- .calculate_objective_gn_fast(
-        theta_proposal,
-        y_v,
-        stim_signal,
-        hrf_eval_times,
-        hrf_interface,
-        n_time,
-        conv_context = conv_context,
-        theta_bounds = theta_bounds
-      )
-
-      if (is.finite(obj_proposal) && obj_proposal < obj_current) {
-        theta_new <- theta_proposal
-        obj_new <- obj_proposal
-        accepted <- TRUE
-        accepted_alpha <- alpha
-        break
+    # Levenberg-Marquardt style retries with increasing damping.
+    for (damp_try in seq_len(4L)) {
+      JtJ_damped <- JtJ + used_damping * identity_n
+      delta <- .solve_gn_direction(JtJ_damped, Jtr)
+      if (is.null(delta) || length(delta) != n_params) {
+        used_damping <- used_damping * 10
+        next
       }
 
-      alpha <- alpha * 0.5
-      if (alpha < min_line_search_alpha) {
+      alpha <- alpha_base
+      for (ls_iter in seq_len(max_line_search_steps)) {
+        theta_proposal <- .apply_bounds(theta_current + alpha * delta, theta_bounds)
+        obj_proposal <- .calculate_objective_gn_fast(
+          theta_proposal,
+          y_v,
+          stim_signal,
+          hrf_eval_times,
+          hrf_interface,
+          n_time,
+          conv_context = conv_context,
+          theta_bounds = theta_bounds,
+          has_intercept = has_intercept
+        )
+
+        if (is.finite(obj_proposal) && obj_proposal < obj_current) {
+          theta_new <- theta_proposal
+          obj_new <- obj_proposal
+          accepted <- TRUE
+          accepted_alpha <- alpha
+          break
+        }
+
+        alpha <- alpha * 0.5
+        if (alpha < min_line_search_alpha) {
+          break
+        }
+      }
+
+      if (accepted) {
         break
       }
+      used_damping <- used_damping * 10
     }
 
     if (!accepted) {
@@ -386,10 +416,16 @@
       break
     }
 
-    if (accepted_alpha >= alpha_base * 0.99) {
+    took_full_step <- accepted_alpha >= alpha_base * 0.99
+    if (took_full_step) {
       alpha_base <- min(1.0, alpha_base * 1.2)
     } else {
       alpha_base <- max(min_line_search_alpha, accepted_alpha)
+    }
+    if (took_full_step) {
+      damping <- max(1e-8, used_damping * 0.5)
+    } else {
+      damping <- max(1e-8, used_damping)
     }
 
     conv_check <- .check_convergence(
@@ -403,11 +439,11 @@
     theta_current <- theta_new
     obj_current <- obj_new
 
-    r2_current <- if (y_centered_ss > 1e-12) {
-      1 - obj_current / y_centered_ss
-    } else {
-      0
-    }
+    r2_current <- .objective_to_r2(
+      objective = obj_current,
+      tss = tss_value,
+      tolerance = 1e-10
+    )
     if (is.finite(r2_current) && r2_current > r2_best) {
       theta_best <- theta_current
       r2_best <- r2_current
@@ -453,7 +489,40 @@
   if (is.null(dim(S))) {
     return(as.numeric(S))
   }
-  as.numeric(S[, 1])
+  if (ncol(S) == 1L) {
+    return(as.numeric(S[, 1]))
+  }
+  as.numeric(rowSums(S))
+}
+
+.compute_tss_for_r2 <- function(y, has_intercept, tolerance = 1e-10) {
+  y <- as.numeric(y)
+  centered_tss <- sum((y - mean(y))^2)
+
+  if (isTRUE(has_intercept)) {
+    return(centered_tss)
+  }
+
+  uncentered_tss <- sum(y^2)
+  if (centered_tss < tolerance) {
+    return(centered_tss)
+  }
+  uncentered_tss
+}
+
+.objective_to_r2 <- function(objective, tss, tolerance = 1e-10) {
+  if (!is.finite(objective) || !is.finite(tss)) {
+    return(NA_real_)
+  }
+  if (abs(tss) < tolerance) {
+    if (abs(objective) < tolerance) {
+      return(1.0)
+    }
+    return(0.0)
+  }
+
+  r2 <- 1.0 - (objective / tss)
+  min(1.0, max(0.0, r2))
 }
 
 .solve_gn_direction <- function(JtJ_ridge, Jtr) {
@@ -537,7 +606,7 @@
     is.numeric(t_hrf)
 }
 
-.calculate_objective_gn <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
+.calculate_objective_gn <- function(theta, y, S, t_hrf, hrf_interface, n_time, has_intercept = FALSE) {
   # Validate theta
   if (!is.numeric(theta) || length(theta) != length(hrf_interface$parameter_names)) {
     stop(sprintf("Invalid theta: expected numeric vector of length %d, got %s of length %d",
@@ -550,13 +619,15 @@
   .calculate_objective_gn_fast(
     theta, y, stim_signal, t_hrf, hrf_interface, n_time,
     conv_context = NULL,
-    theta_bounds = NULL
+    theta_bounds = NULL,
+    has_intercept = has_intercept
   )
 }
 
 .calculate_objective_gn_fast <- function(theta, y, stim_signal, t_hrf, hrf_interface, n_time,
                                          conv_context = NULL,
-                                         theta_bounds = NULL) {
+                                         theta_bounds = NULL,
+                                         has_intercept = FALSE) {
   if (!is.numeric(theta) || length(theta) != length(hrf_interface$parameter_names)) {
     return(Inf)
   }
@@ -568,7 +639,8 @@
   }
 
   lwu_bounds <- .resolve_lwu_cpp_bounds(hrf_interface, theta_bounds = theta_bounds)
-  if (.can_use_lwu_cpp_gn(theta, y, stim_signal, t_hrf, hrf_interface, lwu_bounds)) {
+  if (!isTRUE(has_intercept) &&
+      .can_use_lwu_cpp_gn(theta, y, stim_signal, t_hrf, hrf_interface, lwu_bounds)) {
     cpp_obj <- tryCatch(
       lwu_gn_objective_cpp(
         theta = as.numeric(theta),
@@ -603,16 +675,36 @@
     return(Inf)
   }
 
-  denom <- sum(x_pred_raw^2)
-  if (!is.finite(denom) || denom < 1e-8) {
-    return(Inf)
+  if (isTRUE(has_intercept)) {
+    x_centered <- x_pred_raw - mean(x_pred_raw)
+    y_centered <- y - mean(y)
+    denom <- sum(x_centered^2)
+    if (!is.finite(denom) || denom < 1e-8) {
+      return(Inf)
+    }
+
+    beta <- as.numeric(crossprod(x_centered, y_centered)) / denom
+    if (!is.finite(beta)) {
+      return(Inf)
+    }
+    intercept <- mean(y) - beta * mean(x_pred_raw)
+    if (!is.finite(intercept)) {
+      return(Inf)
+    }
+    x_pred <- intercept + beta * x_pred_raw
+  } else {
+    denom <- sum(x_pred_raw^2)
+    if (!is.finite(denom) || denom < 1e-8) {
+      return(Inf)
+    }
+
+    beta <- as.numeric(crossprod(x_pred_raw, y)) / denom
+    if (!is.finite(beta)) {
+      return(Inf)
+    }
+    x_pred <- beta * x_pred_raw
   }
 
-  beta <- as.numeric(crossprod(x_pred_raw, y)) / denom
-  if (!is.finite(beta)) {
-    return(Inf)
-  }
-  x_pred <- beta * x_pred_raw
   if (any(!is.finite(x_pred))) {
     return(Inf)
   }
@@ -637,18 +729,20 @@
 #' @param n_time Integer number of time points
 #' @return List with jacobian matrix, residuals, and amplitude, or NULL if singular
 #' @noRd
-.get_jacobian_and_residuals <- function(theta, y, S, t_hrf, hrf_interface, n_time) {
+.get_jacobian_and_residuals <- function(theta, y, S, t_hrf, hrf_interface, n_time, has_intercept = FALSE) {
   stim_signal <- .extract_primary_stimulus(S)
   .get_jacobian_and_residuals_fast(
     theta, y, stim_signal, t_hrf, hrf_interface, n_time,
     conv_context = NULL,
-    theta_bounds = NULL
+    theta_bounds = NULL,
+    has_intercept = has_intercept
   )
 }
 
 .get_jacobian_and_residuals_fast <- function(theta, y, stim_signal, t_hrf, hrf_interface, n_time,
                                              conv_context = NULL,
-                                             theta_bounds = NULL) {
+                                             theta_bounds = NULL,
+                                             has_intercept = FALSE) {
   n_params <- length(theta)
   if (n_params == 0L || !is.numeric(theta) || any(!is.finite(theta))) {
     return(NULL)
@@ -661,7 +755,8 @@
   }
   
   lwu_bounds <- .resolve_lwu_cpp_bounds(hrf_interface, theta_bounds = theta_bounds)
-  if (.can_use_lwu_cpp_gn(theta, y, stim_signal, t_hrf, hrf_interface, lwu_bounds)) {
+  if (!isTRUE(has_intercept) &&
+      .can_use_lwu_cpp_gn(theta, y, stim_signal, t_hrf, hrf_interface, lwu_bounds)) {
     cpp_info <- tryCatch(
       lwu_gn_jacobian_cpp(
         theta = as.numeric(theta),
@@ -727,28 +822,53 @@
     return(NULL)
   }
   
-  # Fit amplitude for current HRF
+  # Fit linear terms for current HRF
   x_hrf <- X_conv[, 1]
-  denom <- sum(x_hrf^2)
-  if (!is.finite(denom) || denom < 1e-8) {
+  deriv <- X_conv[, -1, drop = FALSE]
+  if (!is.matrix(deriv) || ncol(deriv) != n_params) {
     return(NULL)
   }
-  beta <- as.numeric(crossprod(x_hrf, y)) / denom
-  if (!is.finite(beta)) {
-    return(NULL)
+
+  if (isTRUE(has_intercept)) {
+    x_centered <- x_hrf - mean(x_hrf)
+    y_centered <- y - mean(y)
+    dx_centered <- sweep(deriv, 2, colMeans(deriv), FUN = "-")
+    denom <- sum(x_centered^2)
+    if (!is.finite(denom) || denom < 1e-8) {
+      return(NULL)
+    }
+
+    beta <- as.numeric(crossprod(x_centered, y_centered)) / denom
+    if (!is.finite(beta)) {
+      return(NULL)
+    }
+
+    dot_dy <- as.numeric(crossprod(dx_centered, y_centered))
+    dot_xd <- as.numeric(crossprod(x_centered, dx_centered))
+    dbeta <- (dot_dy - 2 * beta * dot_xd) / denom
+    jacobian <- -beta * dx_centered - tcrossprod(x_centered, dbeta)
+    intercept <- mean(y) - beta * mean(x_hrf)
+    residuals <- y - intercept - beta * x_hrf
+  } else {
+    denom <- sum(x_hrf^2)
+    if (!is.finite(denom) || denom < 1e-8) {
+      return(NULL)
+    }
+    beta <- as.numeric(crossprod(x_hrf, y)) / denom
+    if (!is.finite(beta)) {
+      return(NULL)
+    }
+
+    residuals <- y - beta * x_hrf
+    dot_dy <- as.numeric(crossprod(deriv, y))
+    dot_xd <- as.numeric(crossprod(x_hrf, deriv))
+    dbeta <- (dot_dy - 2 * beta * dot_xd) / denom
+    jacobian <- -beta * deriv - tcrossprod(x_hrf, dbeta)
   }
-  
-  # Residuals
-  residuals <- y - beta * x_hrf
+
   if (any(!is.finite(residuals))) {
     return(NULL)
   }
-  
-  deriv <- X_conv[, -1, drop = FALSE]
-  dot_dy <- as.numeric(crossprod(deriv, y))
-  dot_xd <- as.numeric(crossprod(x_hrf, deriv))
-  dbeta <- (dot_dy - 2 * beta * dot_xd) / denom
-  jacobian <- -beta * deriv - tcrossprod(x_hrf, dbeta)
   if (any(!is.finite(jacobian))) {
     return(NULL)
   }

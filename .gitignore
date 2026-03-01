@@ -24,3 +24,5 @@ debug_test.R
 quick_test.R
 run_engineering_demo.R
 
+# Benchmark artifacts
+benchmarks/results/

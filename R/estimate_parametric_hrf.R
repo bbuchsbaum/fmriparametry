@@ -37,6 +37,13 @@
 #' @param hrf_span Duration for HRF evaluation (default 30 seconds)
 #' @param lambda_ridge Ridge penalty for stability (default 0.01)
 #' @param mask Optional voxel selection mask
+#' @param multi_seed Logical: run core estimation from multiple seed points and
+#'   keep the best R-squared per voxel? (default TRUE). When TRUE, Stage 2
+#'   evaluates several expansion points spanning the parameter space to reduce
+#'   sensitivity to the initial seed.
+#' @param seed_grid Optional numeric matrix (n_seeds x n_params) of custom seed
+#'   points. When NULL (default), a built-in 5-point grid is used. Only used
+#'   when `multi_seed = TRUE`.
 #' @param global_refinement Logical: perform iterative global refinement? (Sprint 2)
 #' @param global_passes Number of global refinement iterations (default 3)
 #' @param convergence_epsilon Convergence criterion for global refinement (default 0.01)
@@ -48,6 +55,8 @@
 #' @param parallel Logical: use parallel processing?
 #' @param n_cores Number of cores for parallel processing (NULL = auto-detect)
 #' @param compute_se Logical: compute standard errors?
+#' @param se_method Character standard-error method: `"delta"` (default) or
+#'   `"sandwich"` for heteroskedasticity-robust covariance estimates.
 #' @param safety_mode Character: "maximum", "balanced", or "performance".
 #'   Determines the level of input validation. "maximum" triggers
 #'   comprehensive checks, "balanced" performs standard checks, and
@@ -110,6 +119,9 @@ estimate_parametric_hrf <- function(
   hrf_span = 30,
   lambda_ridge = 0.01,
   mask = NULL,
+  # Multi-seed estimation
+  multi_seed = TRUE,
+  seed_grid = NULL,
   # Global refinement
   global_refinement = TRUE,
   global_passes = 3,
@@ -132,13 +144,14 @@ estimate_parametric_hrf <- function(
   n_cores = NULL,
   # Output options
   compute_se = TRUE,
+  se_method = c("delta", "sandwich"),
   # Safety and diagnostics
   safety_mode = c("balanced", "maximum", "performance"),
   progress = TRUE,
   verbose = TRUE
 ) {
-  
-  
+  se_method <- match.arg(se_method)
+
   # Ensure matrices are double-precision for C++ backend
   if (is.matrix(fmri_data) && typeof(fmri_data) != "double") {
     storage.mode(fmri_data) <- "double"
@@ -160,6 +173,8 @@ estimate_parametric_hrf <- function(
     hrf_span = hrf_span,
     lambda_ridge = lambda_ridge,
     mask = mask,
+    multi_seed = multi_seed,
+    seed_grid = seed_grid,
     global_refinement = global_refinement,
     global_passes = global_passes,
     convergence_epsilon = convergence_epsilon,
@@ -171,6 +186,7 @@ estimate_parametric_hrf <- function(
     parallel = parallel,
     n_cores = n_cores,
     compute_se = compute_se,
+    se_method = se_method,
     safety_mode = safety_mode,
     progress = progress,
     verbose = verbose
