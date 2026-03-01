@@ -24,11 +24,13 @@ test_that("global refinement improves parameter estimates", {
 
   bad_seed <- c(9, 4, 0.1)
 
+  # Use multi_seed = FALSE to isolate refinement effect from multi-seed
   fit_no_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = bad_seed,
+    multi_seed = FALSE,
     global_refinement = FALSE,
     verbose = FALSE
   )
@@ -36,8 +38,9 @@ test_that("global refinement improves parameter estimates", {
   fit_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = bad_seed,
+    multi_seed = FALSE,
     global_refinement = TRUE,
     global_passes = 2,
     verbose = FALSE
@@ -85,32 +88,35 @@ test_that("global refinement works with multiple voxels", {
   # Bad starting seed for all voxels
   bad_seed <- c(8, 4, 0.1)
   
+  # Use multi_seed = FALSE to isolate refinement effect from multi-seed
   fit_no_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = bad_seed,
+    multi_seed = FALSE,
     global_refinement = FALSE,
     verbose = FALSE
   )
-  
+
   fit_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = bad_seed,
+    multi_seed = FALSE,
     global_refinement = TRUE,
     global_passes = 3,
     verbose = FALSE
   )
-  
+
   # Expect improvement in average R-squared
   expect_gt(mean(fit_refine$r_squared), mean(fit_no_refine$r_squared))
-  
+
   # Expect improvement in parameter accuracy for most voxels
   errors_no_refine <- rowSums((coef(fit_no_refine) - true_params)^2)
   errors_refine <- rowSums((coef(fit_refine) - true_params)^2)
-  
+
   # Most voxels should improve
   improved_count <- sum(errors_refine < errors_no_refine)
   expect_gt(improved_count, n_vox / 2)
@@ -141,7 +147,7 @@ test_that("global refinement convergence works properly", {
     results[[paste0("passes_", passes)]] <- estimate_parametric_hrf(
       fmri_data = Y,
       event_model = event_mat,
-      parametric_hrf = "lwu",
+      parametric_model = "lwu",
       theta_seed = c(8, 4, 0.1),  # Bad seed
       global_refinement = TRUE,
       global_passes = passes,
@@ -196,7 +202,7 @@ test_that("global refinement handles difficult optimization cases", {
     fit <- estimate_parametric_hrf(
       fmri_data = Y,
       event_model = event_mat,
-      parametric_hrf = "lwu",
+      parametric_model = "lwu",
       theta_seed = bad_seed,
       global_refinement = TRUE,
       global_passes = 2,
@@ -244,7 +250,7 @@ test_that("global refinement shows improvement over baseline", {
   fit_global <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = moderately_bad_seed,
     global_refinement = TRUE,
     global_passes = 3,
@@ -254,7 +260,7 @@ test_that("global refinement shows improvement over baseline", {
   fit_no_global <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = event_mat,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     theta_seed = moderately_bad_seed,
     global_refinement = FALSE,
     verbose = FALSE

@@ -60,7 +60,7 @@ test_that("R-squared is recalculated after refinement", {
   result_no_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design_matrix,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = FALSE,
     kmeans_refinement = FALSE,
     tiered_refinement = "none",
@@ -73,7 +73,7 @@ test_that("R-squared is recalculated after refinement", {
   result_with_refine <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design_matrix,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = TRUE,
     tiered_refinement = "moderate",
     theta_seed = c(5, 2.5, 0.25),  # Same starting point
@@ -180,7 +180,7 @@ test_that("R-squared calculation handles edge cases", {
   result <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = TRUE,
     verbose = FALSE
   )
@@ -214,7 +214,7 @@ test_that("R-squared is preserved when refinement is disabled", {
   result <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = FALSE,
     kmeans_refinement = FALSE,
     tiered_refinement = "none",
@@ -268,20 +268,23 @@ test_that("R-squared is correctly recalculated when parameters change", {
   bad_seed <- c(15, 0.5, 1.2)  # Way off from optimal
   good_seed <- c(6, 3, 0.3)    # Much closer to optimal
   
+  # Use multi_seed = FALSE to isolate the effect of the starting seed
   result_bad_start <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design_matrix,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = FALSE,
+    multi_seed = FALSE,
     theta_seed = bad_seed,
     verbose = FALSE
   )
-  
+
   result_good_start <- estimate_parametric_hrf(
     fmri_data = Y,
     event_model = design_matrix,
-    parametric_hrf = "lwu",
+    parametric_model = "lwu",
     global_refinement = FALSE,
+    multi_seed = FALSE,
     theta_seed = good_seed,
     verbose = FALSE
   )
